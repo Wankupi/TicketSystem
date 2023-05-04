@@ -3,3 +3,6 @@ project(TicketSystem)
 
 set(CMAKE_CXX_STANDARD 17)
 
+include_directories(src utility utility/stlite)
+
+add_executable(main src/main.cpp)
