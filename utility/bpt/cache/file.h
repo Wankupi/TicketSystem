@@ -81,7 +81,7 @@ private:
 	}
 
 private:
-	DataBase<T, true> db;
+	DataBase<T, true, true> db;
 	list<Node> que;
 	unordered_map<int, typename list<Node>::iterator> table;
 	vector<int> deletedIds;

@@ -4,7 +4,7 @@
 #include <string>
 
 namespace kupi {
-template<typename Type, bool isTrash = false>
+template<typename Type, bool isTrash = false, bool isAlign = false>
 class DataBase {
 public:
 	using emptyHook = void(std::fstream &);
@@ -41,8 +41,7 @@ public:
 	int capacity();
 
 protected:
-	static constexpr int BLOCK_SIZE = (sizeof(Type) + 4095) / 4096 * 4096;
-	// static constexpr int BLOCK_SIZE = sizeof(Type);
+	static constexpr int BLOCK_SIZE = isAlign ? (sizeof(Type) + 4095) / 4096 * 4096 : sizeof(Type);
 	/**
      * @return the 1-indexed id of a usable place
      */
@@ -54,8 +53,8 @@ protected:
 	std::fstream trash;
 };
 
-template<typename Type, bool isTrash>
-DataBase<Type, isTrash>::DataBase(const std::string &filename, emptyHook *hook)
+template<typename Type, bool isTrash, bool isAlign>
+DataBase<Type, isTrash, isAlign>::DataBase(const std::string &filename, emptyHook *hook)
 	: filename(filename) {
 	std::filesystem::path path(filename);
 	if (path.has_parent_path()) {
@@ -79,35 +78,35 @@ DataBase<Type, isTrash>::DataBase(const std::string &filename, emptyHook *hook)
 	}
 }
 
-template<typename Type, bool isTrash>
-int DataBase<Type, isTrash>::insert(const Type &data) {
+template<typename Type, bool isTrash, bool isAlign>
+int DataBase<Type, isTrash, isAlign>::insert(const Type &data) {
 	int id = newId();
 	file.seekp((id - 1) * BLOCK_SIZE);
 	file.write(reinterpret_cast<char const *>(&data), sizeof(Type));
 	return id;
 }
 
-template<typename Type, bool isTrash>
-Type DataBase<Type, isTrash>::read(int id) {
+template<typename Type, bool isTrash, bool isAlign>
+Type DataBase<Type, isTrash, isAlign>::read(int id) {
 	Type ret;
 	read(id, ret);
 	return ret;
 }
 
-template<typename Type, bool isTrash>
-void DataBase<Type, isTrash>::read(int id, Type &res) {
+template<typename Type, bool isTrash, bool isAlign>
+void DataBase<Type, isTrash, isAlign>::read(int id, Type &res) {
 	file.seekg((id - 1) * BLOCK_SIZE);
 	file.read(reinterpret_cast<char *>(&res), sizeof(Type));
 }
 
-template<typename Type, bool isTrash>
-void DataBase<Type, isTrash>::write(int id, const Type &data) {
+template<typename Type, bool isTrash, bool isAlign>
+void DataBase<Type, isTrash, isAlign>::write(int id, const Type &data) {
 	file.seekp((id - 1) * BLOCK_SIZE);
 	file.write(reinterpret_cast<char const *>(&data), sizeof(Type));
 }
 
-template<typename Type, bool isTrash>
-int DataBase<Type, isTrash>::newId() {
+template<typename Type, bool isTrash, bool isAlign>
+int DataBase<Type, isTrash, isAlign>::newId() {
 	if constexpr (!isTrash) return size() + 1;
 	int id = 0;
 	trash.seekg(0);
@@ -125,8 +124,8 @@ int DataBase<Type, isTrash>::newId() {
 	return id;
 }
 
-template<typename Type, bool isTrash>
-void DataBase<Type, isTrash>::erase(int id) {
+template<typename Type, bool isTrash, bool isAlign>
+void DataBase<Type, isTrash, isAlign>::erase(int id) {
 	if constexpr (!isTrash) return;
 	trash.seekg(0);
 	int count_trash = 0;
@@ -138,16 +137,16 @@ void DataBase<Type, isTrash>::erase(int id) {
 	trash.write(reinterpret_cast<char *>(&count_trash), sizeof(int));
 }
 
-template<typename Type, bool isTrash>
-int DataBase<Type, isTrash>::size() {
+template<typename Type, bool isTrash, bool isAlign>
+int DataBase<Type, isTrash, isAlign>::size() {
 	int count_blocks = capacity(), count_trash = 0;
 	trash.seekg(0);
 	trash.read(reinterpret_cast<char *>(&count_trash), sizeof(int));
 	return count_blocks - count_trash;
 }
 
-template<typename Type, bool isTrash>
-int DataBase<Type, isTrash>::capacity() {
+template<typename Type, bool isTrash, bool isAlign>
+int DataBase<Type, isTrash, isAlign>::capacity() {
 	file.seekg(0, std::ios::end);
 	return (size_t(file.tellg()) + BLOCK_SIZE - 1) / BLOCK_SIZE;
 }
