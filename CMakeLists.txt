@@ -5,4 +5,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 include_directories(src utility utility/stlite)
 
-add_executable(main src/main.cpp)
+set(sources src/main.cpp
+        src/terminal/TicketTerminal.cpp
+        src/user/user.cpp
+        )
+
+add_executable(main ${sources})
