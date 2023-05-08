@@ -1,19 +1,24 @@
 #pragma once
+#include "set.h"
 #include "train/train.h"
 #include "user/user.h"
 #include <ostream>
+
+namespace ticket {
 
 class TicketTerminal {
 public:
 	TicketTerminal(UserManager &userManager, TrainManager &trainManager) : users(userManager), trains(trainManager) {}
 	int run(char const *s, std::ostream &os);
+	static char const *run_result_to_string(int res);
 
 private:
 	UserManager &users;
 	TrainManager &trains;
+	kupi::set<int> loginList;
 
 private:
-	using Params = char const *[26];
+	using Params = char const *[256];
 	using Function = int (TicketTerminal::*)(Params const &param, std::ostream &os);
 	int run_add_user(Params const &param, std::ostream &os);
 	int run_login(Params const &param, std::ostream &os);
@@ -32,7 +37,9 @@ private:
 	int run_clean(Params const &param, std::ostream &os);
 	int run_exit(Params const &param, std::ostream &os);
 	int run_nothing(Params const &param, std::ostream &os) { return 0; }
-	
-	static void parse_command(char *s, char *(&params)[26]);
+
+	static void parse_command(char *s, Params &params);
 	static Function get_function(char const *command);
 };
+
+}// namespace ticket

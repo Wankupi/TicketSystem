@@ -24,6 +24,8 @@ public:
      */
 	Type read(int id);
 	void read(int id, Type &res);
+	template<unsigned offset, typename N>
+	void read(int id, N &res);
 	/**
      * @brief Write a Data to file
      * @param id 1-indexed
@@ -97,6 +99,14 @@ template<typename Type, bool isTrash, bool isAlign>
 void DataBase<Type, isTrash, isAlign>::read(int id, Type &res) {
 	file.seekg((id - 1) * BLOCK_SIZE);
 	file.read(reinterpret_cast<char *>(&res), sizeof(Type));
+}
+
+template<typename Type, bool isTrash, bool isAlign>
+template<unsigned offset, typename N>
+void DataBase<Type, isTrash, isAlign>::read(int id, N &res) {
+	static_assert(sizeof(N) + offset <= sizeof(Type));
+	file.seekg((id - 1) * BLOCK_SIZE + offset);
+	file.read(reinterpret_cast<char *>(&res), sizeof(N));
 }
 
 template<typename Type, bool isTrash, bool isAlign>
