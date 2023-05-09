@@ -10,14 +10,13 @@ static bool check_visible(char const *str) { return true; }
 // user.mail
 static bool check_mail(char const *str) { return true; }
 
-
 std::ostream &operator<<(std::ostream &os, User const &user) {
 	return os << user.username << ' ' << user.name << ' ' << user.mail << ' ' << int(user.privilege);
 }
 
 unsigned char UserManager::get_privilege(int id) {
 	unsigned char p;
-	data.read<offsetof(User, privilege)>(id, p);
+	data.read(id, p, offsetof(User, privilege));
 	return p;
 }
 
@@ -53,7 +52,7 @@ std::optional<User> UserManager::set(int id, const char *username, const char *p
 	if (mail) user.mail = mail;
 	if (privilege <= 10) user.privilege = privilege;
 	if (username || password || name || mail || privilege)
-		data.write(id, user); // if no change then not write
+		data.write(id, user);// if no change then not write
 	return user;
 }
 
@@ -61,7 +60,7 @@ int UserManager::check_password(const char *username, const char *password) {
 	int id = find(username);
 	if (!id) return -1;
 	decltype(User::password) pwd;
-	data.read<offsetof(User, password)>(id, pwd);
+	data.read(id, pwd, offsetof(User, password));
 	if (pwd != decltype(User::password)(password)) return -2;
 	return id;
 }

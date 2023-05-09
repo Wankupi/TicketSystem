@@ -5,6 +5,7 @@ char buff[1024 * 4];
 
 void clear() {
 	std::filesystem::remove_all("users");
+	std::filesystem::remove_all("train");
 }
 
 int main() {
@@ -14,11 +15,11 @@ int main() {
 	std::cin.tie(0);
 
 	ticket::UserManager um("users/main.db", "users/index");
-	ticket::TrainManager tm;
+	ticket::TrainManager tm("train/main.db", "train/ticket.db", "train/index");
 	ticket::TicketTerminal term(um, tm);
 	char step[20];
 	while (std::cin >> step) {
-		std::cout << step << " ";
+		std::cout << step << ' ';
 		std::cin.get();
 		std::cin.getline(buff, sizeof(buff));
 		int r = term.run(buff, std::cout);

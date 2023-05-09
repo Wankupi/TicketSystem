@@ -24,13 +24,15 @@ public:
      */
 	Type read(int id);
 	void read(int id, Type &res);
-	template<unsigned offset, typename N>
-	void read(int id, N &res);
+	template<typename N>
+	void read(int id, N &res, int offset);
 	/**
      * @brief Write a Data to file
      * @param id 1-indexed
      */
 	void write(int id, Type const &);
+	template<typename N>
+	void write(int id, N &res, int offset);
 	/**
      * @param id 1-indexed
      * @attention just remove the id to recycle, do not clear the data on disk
@@ -102,9 +104,8 @@ void DataBase<Type, isTrash, isAlign>::read(int id, Type &res) {
 }
 
 template<typename Type, bool isTrash, bool isAlign>
-template<unsigned offset, typename N>
-void DataBase<Type, isTrash, isAlign>::read(int id, N &res) {
-	static_assert(sizeof(N) + offset <= sizeof(Type));
+template<typename N>
+void DataBase<Type, isTrash, isAlign>::read(int id, N &res, int offset) {
 	file.seekg((id - 1) * BLOCK_SIZE + offset);
 	file.read(reinterpret_cast<char *>(&res), sizeof(N));
 }
@@ -113,6 +114,13 @@ template<typename Type, bool isTrash, bool isAlign>
 void DataBase<Type, isTrash, isAlign>::write(int id, const Type &data) {
 	file.seekp((id - 1) * BLOCK_SIZE);
 	file.write(reinterpret_cast<char const *>(&data), sizeof(Type));
+}
+
+template<typename Type, bool isTrash, bool isAlign>
+template<typename N>
+void DataBase<Type, isTrash, isAlign>::write(int id, N &res, int offset) {
+	file.seekp((id - 1) * BLOCK_SIZE + offset);
+	file.write(reinterpret_cast<char *>(&res), sizeof(N));
 }
 
 template<typename Type, bool isTrash, bool isAlign>

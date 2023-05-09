@@ -63,12 +63,23 @@ void TicketTerminal::parse_command(char *s, Params &params) {
 }
 
 // clang-format off
-enum RunResult : int { normal, exit, params_missing, params_invalid, permission_denied, user_not_found, re_login, un_login };
+enum RunResult : int { normal,
+					   exit,
+					   file_error,
+					   params_missing,
+					   params_invalid,
+					   permission_denied,
+					   user_not_found,
+					   re_login,
+					   un_login,
+					   trainId_conflict,
+					   train_not_found,
+					   train_already_released };
 // clang-format on
 
 static inline int ok(std::ostream &os) {
 	os << '0';
-	return 0;
+	return normal;
 }
 
 static inline int fail(std::ostream &os, int code = normal) {
@@ -149,10 +160,94 @@ int TicketTerminal::run_modify_profile(Params const &params, std::ostream &os) {
 	return normal;
 }
 
-int TicketTerminal::run_add_train(Params const &params, std::ostream &os) { return 0; }
-int TicketTerminal::run_delete_train(Params const &params, std::ostream &os) { return 0; }
-int TicketTerminal::run_release_train(Params const &params, std::ostream &os) { return 0; }
-int TicketTerminal::run_query_train(Params const &params, std::ostream &os) { return 0; }
+void split_string_to_array(char const *start, decltype(Train::stations) t, int n) {
+	for (int i = 0; i < n; ++i) {
+		auto dest = t[i].data();
+		while (*start && *start != '|')
+			*dest++ = *start++;
+		*dest = 0;
+		++start;
+	}
+}
+
+void split_string_to_int(char const *start, int t[], int n) {
+	for (int i = 0; i < n; ++i) {
+		t[i] = atoi(start);
+		while (*start && *start != '|')
+			*start++;
+		++start;
+	}
+}
+
+int TicketTerminal::run_add_train(Params const &params, std::ostream &os) {
+	Train train;
+	train.trainID = params['i'];
+	train.stationNum = atoi(params['n']);
+	train.seatNum = atoi(params['m']);
+	split_string_to_array(params['s'], train.stations, train.stationNum);
+	split_string_to_int(params['p'], train.prices, train.stationNum - 1);
+	split_string_to_int(params['t'], train.travelTimes, train.stationNum - 1);
+	split_string_to_int(params['o'], train.stopoverTimes, train.stationNum - 2);
+	train.startTime = Time{params['x']};
+	train.saleDateBegin = Date{params['d']};
+	train.saleDateEnd = Date{params['d'] + 6};
+	train.type = *params['y'];
+
+	int res = trains.add_train(train);
+	if (res == -1)
+		return fail(os, trainId_conflict);
+	else if (res == -2)
+		return fail(os, file_error);
+	return ok(os);
+}
+
+int TicketTerminal::run_delete_train(Params const &params, std::ostream &os) {
+	int res = trains.delete_train(params['i']);
+	if (res == -1) return fail(os, train_not_found);
+	else if (res == -2)
+		return fail(os, train_already_released);
+	return ok(os);
+}
+
+int TicketTerminal::run_release_train(Params const &params, std::ostream &os) {
+	int res = trains.release_train(params['i']);
+	if (res == -1) return fail(os, train_not_found);
+	else if (res == -2)
+		return fail(os, train_already_released);
+	return ok(os);
+}
+
+int TicketTerminal::run_query_train(Params const &params, std::ostream &os) {
+	int id = trains.find(params['i']);
+	if (id <= 0) return fail(os, train_not_found);
+	Train train = trains.get(id);
+	TicketsOnPath ts;
+	Date d{params['d']};
+	if (!(train.saleDateBegin <= d && d <= train.saleDateEnd))
+		memset(&ts, 0, sizeof(int) * (train.stationNum - 1));
+	else if (train.released)
+		ts = trains.avaliable_ticket(id, Date{params['d']});
+	else {
+		for (int i = 0; i < train.stationNum - 1; ++i)
+			ts[i] = train.seatNum;
+	}
+
+	os << train.trainID << ' ' << train.type << '\n';
+	DateTime dt{d, train.startTime};
+	os << train.stations[0] << " xx-xx xx:xx -> " << dt << " 0 " << ts[0] << '\n';
+	dt += train.travelTimes[0];
+	int total_price = train.prices[0];
+	for (int i = 1; i < train.stationNum - 1; ++i) {
+		os << train.stations[i] << ' ' << dt << " -> ";
+		dt += train.stopoverTimes[i - 1];
+		os << dt << ' ' << total_price << ' ' << ts[i] << '\n';
+		dt += train.travelTimes[i];
+		total_price += train.prices[i];
+	}
+	os << train.stations[train.stationNum - 1] << ' ' << dt << " -> xx-xx xx:xx " << total_price << " x";
+	return normal;
+}
+
 int TicketTerminal::run_query_ticket(Params const &params, std::ostream &os) { return 0; }
 int TicketTerminal::run_query_transfer(Params const &params, std::ostream &os) { return 0; }
 int TicketTerminal::run_buy_ticket(Params const &params, std::ostream &os) { return 0; }
@@ -167,7 +262,19 @@ int TicketTerminal::run_exit(Params const &params, std::ostream &os) {
 
 
 char const *TicketTerminal::run_result_to_string(int res) {
-	constexpr const char *error_code[] = {"normal", "exit", "params_missing", "params_invalid", "permission_denied", "user_not_found", "re_login", "un_login"};
+	constexpr const char *error_code[] = {
+			"normal",
+			"exit",
+			"file_error",
+			"params_missing",
+			"params_invalid",
+			"permission_denied",
+			"user_not_found",
+			"re_login",
+			"un_login",
+			"trainId_conflict",
+			"train_not_found",
+			"train_already_released"};
 	return error_code[res];
 }
 
