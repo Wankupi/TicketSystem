@@ -1,6 +1,8 @@
 #pragma once
 #include "base.h"
+#include "file/DataBase.h"
 #include "bpt/bpt.h"
+#include "bpt/multibpt.h"
 
 namespace ticket {
 struct Train {
@@ -66,7 +68,7 @@ private:
 private:
 	kupi::DataBase<Train, true, false> trains;
 	kupi::DataBase<Tickets, false, false> tickets;
-	kupi::bpt<decltype(Train::trainID), int, kupi::FileCache> trainID2int;
+	kupi::bpt<decltype(Train::trainID), int> trainID2int;
 };
 
 }// namespace ticket

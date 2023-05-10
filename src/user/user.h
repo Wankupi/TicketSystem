@@ -1,5 +1,6 @@
 #pragma once
 #include "base.h"
+#include "file/DataBase.h"
 #include "bpt/bpt.h"
 #include <optional>
 
@@ -51,7 +52,7 @@ public:
 	bool empty() const { return !siz; }
 private:
 	kupi::DataBase<User, false, false> data;
-	kupi::bpt<String<20>, int, kupi::FileCache> name2id;
+	kupi::bpt<String<20>, int> name2id;
 	int siz;
 };
 

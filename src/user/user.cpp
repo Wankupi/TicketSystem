@@ -22,7 +22,8 @@ unsigned char UserManager::get_privilege(int id) {
 
 int UserManager::find(const char *username) {
 	auto res = name2id.find(username);
-	if (!res.empty()) return res[0];
+	//	if (!res.empty()) return res[0];
+	if (res != name2id.end()) return res->second;
 	return 0;
 }
 
@@ -33,7 +34,7 @@ int UserManager::add_user(const char *username, const char *password, const char
 	User user{username, password, name, mail, privilege};
 	int id = data.insert(user);
 	if (id) {
-		name2id.insert(username, id);
+		name2id.insert({username, id});
 		++siz;
 	}
 	return id;
@@ -43,9 +44,9 @@ std::optional<User> UserManager::set(int id, const char *username, const char *p
 	if ((username && !check_username(username)) || (password && !check_visible(password)) || (name && !check_name(name)) || (mail && !check_mail(mail))) return std::nullopt;
 	User user{data.read(id)};
 	if (username) {
-		name2id.erase(user.username, id);
+		name2id.erase(user.username);
 		user.username = username;
-		name2id.insert(user.username, id);
+		name2id.insert({user.username, id});
 	}
 	if (password) user.password = password;
 	if (name) user.name = name;

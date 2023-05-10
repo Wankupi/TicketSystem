@@ -3,20 +3,20 @@
 namespace ticket {
 
 int TrainManager::add_train(Train const train) {
-	if (!trainID2int.find(train.trainID).empty())
+	if (trainID2int.find(train.trainID) != trainID2int.end())
 		return -1;
 	// there should be some checks
 	int id = trains.insert(train);
 	if (id <= 0)
 		return -2;
-	trainID2int.insert(train.trainID, id);
+	trainID2int.insert({train.trainID, id});
 	return id;
 }
 
 int TrainManager::find(char const *trainID) {
 	auto res = trainID2int.find(trainID);
-	if (res.empty()) return -1;
-	return res[0];
+	if (res == trainID2int.end()) return -1;
+	return res->second;
 }
 
 inline std::pair<int, bool> TrainManager::get_id_and_released(char const *trainID) {
@@ -43,7 +43,7 @@ int TrainManager::delete_train(char const *trainID) {
 	auto [id, isReleased] = get_id_and_released(trainID);
 	if (id <= 0) return -1;
 	if (isReleased) return -2;
-	trainID2int.erase(trainID, id);
+	trainID2int.erase(trainID);
 	return 0;
 }
 
