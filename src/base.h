@@ -61,16 +61,16 @@ public:
 	operator int() const { return date; }
 	friend std::ostream &operator<<(std::ostream &os, Date const &time) {
 		int month = 6, day = time.date;
-		if (day > 30) {
+		if (day >= 30) {
 			++month;
-			day -= 31;
+			day -= 30;
 		}
-		if (day > 30) {
+		if (day >= 31) {
 			++month;
 			day -= 31;
 		}
 		return os << std::setfill('0') << std::setw(2) << month << '-'
-				  << std::setw(2) << day;
+				  << std::setw(2) << day + 1;
 	}
 };
 
@@ -97,6 +97,22 @@ struct DateTime {
 		d.date += t.time / (24 * 60);
 		t.time %= 24 * 60;
 		return *this;
+	}
+	DateTime &operator-=(int x) {
+		t.time -= x;
+		d.date -= (-t.time + 24 * 60) / (24 * 60);
+		t.time %= 24 * 60;
+		if (t.time < 0) t.time += 24 * 60;
+		return *this;
+	}
+	int operator-(DateTime const &B) const {
+		return (B.d.date - d.date) * 24 * 60 + (B.t.time - t.time);
+	}
+	DateTime operator+(int x) const {
+		return DateTime(*this) += x;
+	}
+	DateTime operator-(int x) const {
+		return DateTime(*this) -= x;
 	}
 };
 

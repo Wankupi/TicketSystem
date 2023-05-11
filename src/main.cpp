@@ -15,7 +15,7 @@ int main() {
 	std::cin.tie(0);
 
 	ticket::UserManager um("users/main.db", "users/index");
-	ticket::TrainManager tm("train/main.db", "train/ticket.db", "train/index");
+	ticket::TrainManager tm("train/main.db", "train/ticket.db", "train/trainID", "train/station");
 	ticket::TicketTerminal term(um, tm);
 	char step[20];
 	while (std::cin >> step) {

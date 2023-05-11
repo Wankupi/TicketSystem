@@ -1,4 +1,5 @@
 #include "TicketTerminal.h"
+#include "algorithm.h"
 #include <cstring>
 
 namespace ticket {
@@ -218,20 +219,11 @@ int TicketTerminal::run_release_train(Params const &params, std::ostream &os) {
 }
 
 int TicketTerminal::run_query_train(Params const &params, std::ostream &os) {
-	int id = trains.find(params['i']);
-	if (id <= 0) return fail(os, train_not_found);
-	Train train = trains.get(id);
+	Train train;
 	TicketsOnPath ts;
 	Date d{params['d']};
-	if (!(train.saleDateBegin <= d && d <= train.saleDateEnd))
-		memset(&ts, 0, sizeof(int) * (train.stationNum - 1));
-	else if (train.released)
-		ts = trains.avaliable_ticket(id, Date{params['d']});
-	else {
-		for (int i = 0; i < train.stationNum - 1; ++i)
-			ts[i] = train.seatNum;
-	}
-
+	if (trains.query_train(params['i'], d, train, ts) < 0)
+		return fail(os, train_not_found);
 	os << train.trainID << ' ' << train.type << '\n';
 	DateTime dt{d, train.startTime};
 	os << train.stations[0] << " xx-xx xx:xx -> " << dt << " 0 " << ts[0] << '\n';
@@ -248,7 +240,26 @@ int TicketTerminal::run_query_train(Params const &params, std::ostream &os) {
 	return normal;
 }
 
-int TicketTerminal::run_query_ticket(Params const &params, std::ostream &os) { return 0; }
+int TicketTerminal::run_query_ticket(Params const &params, std::ostream &os) {
+	std::vector<TrainManager::QueryResult> res;
+	trains.query_ticket(params['s'], params['t'], Date{params['d']}, res);
+	std::vector<int> p(res.size(), 0);
+	for (int i = 0; i < p.size(); ++i) p[i] = i;
+	if (params['p'] && params['p'][0] == 't')
+		kupi::sort(p.begin(), p.end(), [&res](int x, int y) { return TrainManager::QueryResult::cmpTime(res[x], res[y]); });
+	else
+		kupi::sort(p.begin(), p.end(), [&res](int x, int y) { return TrainManager::QueryResult::cmpCost(res[x], res[y]); });
+
+	os << res.size();
+	for (auto const &qr: res) {
+		os << '\n'
+		   << qr.trainID << ' ' << params['s'] << ' ' << qr.leave << " -> " << params['t'] << ' ' << (qr.leave + qr.time)
+		   << ' ' << qr.price << ' ' << qr.seat;
+	}
+	return normal;
+}
+
+
 int TicketTerminal::run_query_transfer(Params const &params, std::ostream &os) { return 0; }
 int TicketTerminal::run_buy_ticket(Params const &params, std::ostream &os) { return 0; }
 int TicketTerminal::run_query_order(Params const &params, std::ostream &os) { return 0; }

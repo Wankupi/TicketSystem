@@ -3,6 +3,7 @@
 #include <algorithm>
 namespace kupi {
 using std::lower_bound;
+using std::sort;
 }
 #else
 
