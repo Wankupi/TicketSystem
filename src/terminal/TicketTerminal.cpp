@@ -63,9 +63,10 @@ void TicketTerminal::parse_command(char *s, Params &params) {
 	}
 }
 
-// clang-format off
+// // clang-format off
 enum RunResult : int { normal,
 					   exit,
+					   clean,
 					   file_error,
 					   params_missing,
 					   params_invalid,
@@ -75,7 +76,9 @@ enum RunResult : int { normal,
 					   un_login,
 					   trainId_conflict,
 					   train_not_found,
-					   train_already_released };
+					   train_already_released,
+					   time_outbound,
+					   bills_not_enough };
 // clang-format on
 
 static inline int ok(std::ostream &os) {
@@ -187,12 +190,16 @@ int TicketTerminal::run_add_train(Params const &params, std::ostream &os) {
 	train.seatNum = atoi(params['m']);
 	split_string_to_array(params['s'], train.stations, train.stationNum);
 	split_string_to_int(params['p'], train.prices, train.stationNum - 1);
-	split_string_to_int(params['t'], train.travelTimes, train.stationNum - 1);
+	split_string_to_int(params['t'], train.travelTime, train.stationNum - 1);
 	split_string_to_int(params['o'], train.stopoverTimes, train.stationNum - 2);
 	train.startTime = Time{params['x']};
 	train.saleDateBegin = Date{params['d']};
 	train.saleDateEnd = Date{params['d'] + 6};
 	train.type = *params['y'];
+
+	for (int i = 1; i < train.stationNum - 1; ++i)
+		train.travelTime[i] += train.travelTime[i - 1] + train.stopoverTimes[i - 1];
+	for (int i = 1; i < train.stationNum - 1; ++i) train.prices[i] += train.prices[i - 1];
 
 	int res = trains.add_train(train);
 	if (res == -1)
@@ -222,21 +229,21 @@ int TicketTerminal::run_query_train(Params const &params, std::ostream &os) {
 	Train train;
 	TicketsOnPath ts;
 	Date d{params['d']};
+	if (int(d) < 0 || int(d) >= 92)
+		return fail(os, time_outbound);
 	if (trains.query_train(params['i'], d, train, ts) < 0)
 		return fail(os, train_not_found);
 	os << train.trainID << ' ' << train.type << '\n';
 	DateTime dt{d, train.startTime};
 	os << train.stations[0] << " xx-xx xx:xx -> " << dt << " 0 " << ts[0] << '\n';
-	dt += train.travelTimes[0];
-	int total_price = train.prices[0];
+	dt += train.travelTime[0];
 	for (int i = 1; i < train.stationNum - 1; ++i) {
 		os << train.stations[i] << ' ' << dt << " -> ";
 		dt += train.stopoverTimes[i - 1];
-		os << dt << ' ' << total_price << ' ' << ts[i] << '\n';
-		dt += train.travelTimes[i];
-		total_price += train.prices[i];
+		os << dt << ' ' << train.prices[i - 1] << ' ' << ts[i] << '\n';
+		dt = DateTime{d, train.startTime} + train.travelTime[i];
 	}
-	os << train.stations[train.stationNum - 1] << ' ' << dt << " -> xx-xx xx:xx " << total_price << " x";
+	os << train.stations[train.stationNum - 1] << ' ' << dt << " -> xx-xx xx:xx " << train.prices[train.stationNum - 2] << " x";
 	return normal;
 }
 
@@ -251,7 +258,8 @@ int TicketTerminal::run_query_ticket(Params const &params, std::ostream &os) {
 		kupi::sort(p.begin(), p.end(), [&res](int x, int y) { return TrainManager::QueryResult::cmpCost(res[x], res[y]); });
 
 	os << res.size();
-	for (auto const &qr: res) {
+	for (int i: p) {
+		auto &qr = res[i];
 		os << '\n'
 		   << qr.trainID << ' ' << params['s'] << ' ' << qr.leave << " -> " << params['t'] << ' ' << (qr.leave + qr.time)
 		   << ' ' << qr.price << ' ' << qr.seat;
@@ -261,10 +269,75 @@ int TicketTerminal::run_query_ticket(Params const &params, std::ostream &os) {
 
 
 int TicketTerminal::run_query_transfer(Params const &params, std::ostream &os) { return 0; }
-int TicketTerminal::run_buy_ticket(Params const &params, std::ostream &os) { return 0; }
-int TicketTerminal::run_query_order(Params const &params, std::ostream &os) { return 0; }
-int TicketTerminal::run_refund_ticket(Params const &params, std::ostream &os) { return 0; }
-int TicketTerminal::run_clean(Params const &params, std::ostream &os) { return 0; }
+
+
+int TicketTerminal::run_buy_ticket(Params const &params, std::ostream &os) {
+	int user_id = users.find(params['u']);
+	if (!loginList.count(user_id))
+		return fail(os, un_login);
+	int train_id = trains.find(params['i']);
+	int count = atoi(params['n']);
+	TrainManager::buy_ticket_result res;
+	auto res_code = trains.buy_ticket(train_id, params['f'], params['t'], Date{params['d']}, count, res);
+
+	if (res_code == 0) {
+		bills.add_bill(Bill{user_id, train_id, params['i'], res.leave, res.arrive, res.start, params['f'], params['t'], res.cost, count, Bill::success});
+		os << res.cost * count;
+	}
+	else if (res_code == 1 && params['q'] && params['q'][0] == 't') {// waiting is true
+		bills.add_bill(Bill{user_id, train_id, params['i'], res.leave, res.arrive, res.start, params['f'], params['t'], res.cost, count, Bill::pending});
+		os << "queue";
+	}
+	else
+		os << -1;
+	return normal;
+}
+
+int TicketTerminal::run_query_order(Params const &params, std::ostream &os) {
+	int user_id = users.find(params['u']);
+	if (!loginList.count(user_id))
+		return fail(os, un_login);
+	auto res = bills.query_bill(user_id);
+	os << res.size();
+	constexpr const char *const status_str[] = {"[success]", "[pending]", "[refunded]"};
+	for (auto const &bill: res) {
+		os << '\n';
+		os << status_str[bill.stat] << ' ' << bill.trainID << ' ' << bill.S << ' ' << bill.leave << " -> " << bill.T << ' ' << bill.arrive << ' ' << bill.price << ' ' << bill.count;
+	}
+	return normal;
+}
+
+int TicketTerminal::run_refund_ticket(Params const &params, std::ostream &os) {
+	int user_id = users.find(params['u']);
+	if (!loginList.count(user_id))
+		return fail(os, un_login);
+	int n = atoi(params['n']);
+	Bill bill;
+	int res = bills.refund_bill(user_id, n, bill);
+	if (res == -1) return fail(os, bills_not_enough);
+	trains.add_ticket(bill.train_id, bill.S, bill.T, bill.start, bill.count);
+
+	// TODO
+	// deal with waiting list
+	std::pair<int, Date> meta{bill.train_id,bill.start};
+	auto cur = bills.get_waiting(meta.first, meta.second), end = bills.end_of_waiting();
+	kupi::vector<int> successes;
+	TrainManager::buy_ticket_result buy_res;
+	while (cur != end && cur->first == meta) {
+		bills.get_bill(cur->second, bill);
+		res = trains.buy_ticket(bill.train_id, bill.S, bill.T, bill.leave.d, bill.count, buy_res);
+		if (res == 0)
+			successes.push_back(cur->second);
+		++cur;
+	}
+	for (auto i : successes) bills.set_success(meta.first, meta.second, i);
+	return ok(os);
+}
+
+int TicketTerminal::run_clean(Params const &params, std::ostream &os) {
+	os << '0';
+	return clean;
+}
 
 int TicketTerminal::run_exit(Params const &params, std::ostream &os) {
 	os << "bye";
@@ -288,5 +361,6 @@ char const *TicketTerminal::run_result_to_string(int res) {
 			"train_already_released"};
 	return error_code[res];
 }
+
 
 }// namespace ticket

@@ -1,5 +1,6 @@
 #pragma once
 #include "set.h"
+#include "ticket/ticket.h"
 #include "train/train.h"
 #include "user/user.h"
 #include <ostream>
@@ -8,13 +9,14 @@ namespace ticket {
 
 class TicketTerminal {
 public:
-	TicketTerminal(UserManager &userManager, TrainManager &trainManager) : users(userManager), trains(trainManager) {}
+	TicketTerminal(UserManager &userManager, TrainManager &trainManager, BillManager &billManager) : users(userManager), trains(trainManager), bills(billManager) {}
 	int run(char const *s, std::ostream &os);
 	static char const *run_result_to_string(int res);
 
 private:
 	UserManager &users;
 	TrainManager &trains;
+	BillManager &bills;
 	kupi::set<int> loginList;
 
 private:

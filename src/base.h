@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 #include <cstring>
 #include <iomanip>
 #include <iostream>
@@ -53,10 +54,12 @@ private:
 public:
 	Date() = default;
 	explicit Date(char const *str) : date(atoi(str + 3) - 1) {
+		constexpr int months[] = {
+				0, 31, 30, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+		constexpr int prefix[] = {
+				0, 31, 61, 92, 122, 153, 183, 214, 245, 275, 305, 335, 365};
 		int month = atoi(str);
-		if (month == 8) date += 30 + 31;
-		else if (month == 7)
-			date += 30;
+		date += prefix[month - 1] - prefix[5];
 	}
 	operator int() const { return date; }
 	friend std::ostream &operator<<(std::ostream &os, Date const &time) {
@@ -114,6 +117,7 @@ struct DateTime {
 	DateTime operator-(int x) const {
 		return DateTime(*this) -= x;
 	}
+	void add_day(int x) { d.date += x; }
 };
 
 inline std::ostream &operator<<(std::ostream &os, DateTime const &time) {

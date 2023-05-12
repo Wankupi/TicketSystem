@@ -13,7 +13,7 @@ struct Train {
 	int seatNum;
 	int prices[99];
 	Time startTime;
-	int travelTimes[99];
+	int travelTime[99];// travelTime[i]: total time to arrive station[i + 1] from station[0]
 	int stopoverTimes[98];
 	Date saleDateBegin;
 	Date saleDateEnd;
@@ -35,7 +35,7 @@ public:
 	 * @return -1 : trainID conflict
 	 * @return -2 : error occurs in insert, should not happen
 	 */
-	//	int add_train(char const *trainID, unsigned char stationNum, int seatNum, char const *stations[], int prices[], Time startTime, int travelTimes[], int stopoverTimes[], Date saleDateStart, Date saleDateEnd, char type);
+	//	int add_train(char const *trainID, unsigned char stationNum, int seatNum, char const *stations[], int prices[], Time startTime, int travelTime[], int stopoverTimes[], Date saleDateStart, Date saleDateEnd, char type);
 	int add_train(Train const &train);
 	/**
 	 * @return 0 : success
@@ -76,11 +76,33 @@ public:
 	};
 	int query_ticket(char const *S, char const *T, Date date, kupi::vector<QueryResult> &res);
 
+	struct buy_ticket_result {
+		int cost;
+		Date start;
+		DateTime leave;
+		DateTime arrive;
+	};
+	/**
+	 * @param number negative is accepted as refund tickets
+	 * @return positive number: total price
+	 * @return -1: queue
+	 * @return -2: other error
+	 */
+	int buy_ticket(int id, char const *S, char const *T, Date date, int count, buy_ticket_result &res) {
+		return buy_ticket(id, String<30>(S), String<30>(T), date, count, res);
+	}
+	int buy_ticket(int id, String<30> const &S, String<30> const &T, Date date, int count, buy_ticket_result &res);
+	/**
+	 * @param date the start date of the train
+	 */
+	int add_ticket(int id, String<30> const &S, String<30> const &T, Date date, int count);
+
 private:
 	/**
 	 * @attention caller should ensure id and d is valid
 	 */
 	void get_ticket(int id, Date d, TicketsOnPath &ret);
+	void set_ticket(int id, Date d, TicketsOnPath &ret);
 
 private:
 	std::pair<int, bool> get_id_and_released(char const *trainID);
@@ -90,13 +112,13 @@ private:
 	kupi::DataBase<Tickets, false, false> tickets;
 	kupi::bpt<decltype(Train::trainID), int> trainID2int;
 	struct train_info_in_station {
-		int train_id;
+		int train_id{};
 		Date firstDay, lastDay;// leaving day
 		Time leave;
-		int stop;
-		int kth;
-		int running_time; // arrival time
-		int price;// prefix sum
+		int stop{};
+		int kth{};
+		int running_time{};// arrival time
+		int price{};       // prefix sum
 		bool operator<(train_info_in_station const &rhs) const { return train_id < rhs.train_id; }
 		bool contain_day(Date d) const { return firstDay <= d && d <= lastDay; }
 	};

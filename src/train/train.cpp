@@ -41,14 +41,12 @@ int TrainManager::release_train(char const *trainID) {
 	for (int i = 0; i < train.stationNum - 1; ++i) {
 		stations.insert({train.stations[i], info});
 		++info.kth;
-		info.running_time += train.travelTimes[i] + info.stop;
+		info.running_time = train.travelTime[i];
 		info.stop = train.stopoverTimes[i];
-		info.price += train.prices[i];
-		first += train.travelTimes[i] + train.stopoverTimes[i];
-		last += train.travelTimes[i] + train.stopoverTimes[i];
-		info.firstDay = first.d;
-		info.lastDay = last.d;
-		info.leave = first.t;
+		info.price = train.prices[i];
+		info.firstDay = (first + train.travelTime[i] + train.stopoverTimes[i]).d;
+		info.lastDay = (last + train.travelTime[i] + train.stopoverTimes[i]).d;
+		info.leave = (first + train.travelTime[i] + train.stopoverTimes[i]).t;
 	}
 	stations.insert({train.stations[train.stationNum - 1], info});
 
@@ -72,6 +70,10 @@ int TrainManager::delete_train(char const *trainID) {
 
 void TrainManager::get_ticket(int id, Date d, TicketsOnPath &tp) {
 	tickets.read(id, tp, sizeof(TicketsOnPath) * (int(d)));
+}
+
+void TrainManager::set_ticket(int id, Date d, TicketsOnPath &tp) {
+	tickets.write(id, tp, sizeof(TicketsOnPath) * (int(d)));
 }
 
 int TrainManager::query_train(char const *trainID, Date date, Train &train, TicketsOnPath &tp) {
@@ -118,6 +120,55 @@ int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::ve
 			res.push_back(qr);
 		}
 	}
+	return 0;
+}
+
+int TrainManager::buy_ticket(int id, String<30> const &S, String<30> const &T, Date date, int count, buy_ticket_result &res) {
+	auto train = get_train(id);
+	int iS = 0, iT = 0;
+	for (iS = 0; iS < train.stationNum; ++iS)
+		if (train.stations[iS] == S) break;
+	assert(iS < train.stationNum);
+	for (iT = iS + 1; iT < train.stationNum; ++iT)
+		if (train.stations[iT] == T) break;
+	assert(iT < train.stationNum);
+
+	DateTime startTime{train.saleDateBegin, train.startTime},
+			leave = startTime + (iS ? train.travelTime[iS - 1] + train.stopoverTimes[iS - 1] : 0),
+			arrive = startTime + train.travelTime[iT - 1];
+	int distance = int(date) - (leave.d);
+	if (distance < 0 || distance > train.saleDateEnd - train.saleDateBegin + 1)
+		return -1;
+	startTime.add_day(distance);
+	leave.add_day(distance);
+	arrive.add_day(distance);
+	int cost = train.prices[iT - 1] - (iS == 0 ? 0 : train.prices[iS - 1]);
+
+	res = {cost, startTime.d, leave, arrive};
+
+	TicketsOnPath tp;
+	get_ticket(id, startTime.d, tp);
+	for (int i = iS; i < iT; ++i)
+		if ((tp[i] -= count) < 0)
+			return 1;
+	set_ticket(id, startTime.d, tp);
+	return 0;
+}
+
+int TrainManager::add_ticket(int id, String<30> const &S, String<30> const &T, Date date, int count) {
+	auto train = get_train(id);
+	String<30> SS{S}, TT{T};
+	int iS = 0, iT = 0;
+	for (iS = 0; iS < train.stationNum; ++iS)
+		if (train.stations[iS] == SS) break;
+	for (iT = iS + 1; iT < train.stationNum; ++iT)
+		if (train.stations[iT] == TT) break;
+
+	TicketsOnPath tp;
+	get_ticket(id, date, tp);
+	for (int i = iS; i < iT; ++i)
+		tp[i] += count;
+	set_ticket(id, date, tp);
 	return 0;
 }
 

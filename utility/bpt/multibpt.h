@@ -26,6 +26,12 @@ public:
 			file.write(reinterpret_cast<char const *>(&x), sizeof(x));
 		}
 	}
+	void erase(Key const &key, Val const &val) {
+		auto [beg, ed] = this->equal_range(key);
+		while (beg != ed && beg->second != val) ++beg;
+		if (beg != ed)
+			this->std::multimap<Key, Val>::erase(beg);
+	}
 
 private:
 	std::string leave_file;
