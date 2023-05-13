@@ -10,8 +10,6 @@ void clear() {
 }
 
 int main() {
-	clear();
-	freopen("t.out", "w", stdout);
 	std::ios::sync_with_stdio(false);
 	std::cin.tie(0);
 
