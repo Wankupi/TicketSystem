@@ -1,4 +1,5 @@
 #include "train.h"
+#include "map.h"
 
 namespace ticket {
 
@@ -105,7 +106,7 @@ int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::ve
 			auto const &t1 = p1->second, &t2 = p2->second;
 			++p1;
 			++p2;
-			if (!t1.contain_day(date) || t2.kth <= t1.kth) continue;
+			if (!t1.contain_leave_day(date) || t2.kth <= t1.kth) continue;
 
 			trains.read(t1.train_id, qr.trainID, offsetof(Train, trainID));
 			qr.leave = DateTime{date, t1.leave};
@@ -123,8 +124,68 @@ int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::ve
 	return 0;
 }
 
+int TrainManager::query_transfer(const char *S, const char *T, Date date, TransferResult &res, bool (*cmp)(TransferResult const &, TransferResult const &)) {
+	String<30> Sa(S), Ta(T);
+	kupi::vector<int> passS, passT;
+	kupi::map<String<30>, std::vector<std::tuple<int, QueryResult>>> arr;// stationName --> { train_id, arrive_date_time }
+	Train train;
+	for (auto p = stations.find(Sa); p != stations.end() && p->first == Sa; ++p) {
+		if (!p->second.contain_leave_day(date)) continue;
+		trains.read(p->second.train_id, train);
+		DateTime start = DateTime(date, p->second.leave) - (p->second.stop + p->second.running_time);
+		for (int i = p->second.kth + 1; i < train.stationNum; ++i) {
+			DateTime arrive = start + train.travelTime[i - 1];
+			arr[train.stations[i]].emplace_back(p->second.train_id, QueryResult{
+																			train.trainID,
+																			DateTime(date, p->second.leave),
+																			train.travelTime[i - 1] - p->second.running_time - p->second.stop,
+																			train.prices[i - 1] - p->second.price,
+																			0});
+		}
+	}
+	TransferResult tmp;
+	int id1 = 0, id2 = 0;
+	bool has_result = false;
+	for (auto p = stations.find(Ta); p != stations.end() && p->first == Ta; ++p) {
+		//		if (!p->second.contain_arrive_day())
+		trains.read(p->second.train_id, train);
+		for (int i = 0; i < p->second.kth; ++i) {
+			auto st = arr.find(train.stations[i]);
+			if (st == arr.end()) continue;
+
+			for (auto [_id1, path1]: st->second) {
+				DateTime arrive_time = path1.leave + path1.time;
+				DateTime leave_time{arrive_time.d, Time(train.startTime + (i ? train.travelTime[i - 1] + train.stopoverTimes[i - 1] : 0))};
+				if (leave_time <= arrive_time) leave_time += 24 * 60;
+
+				DateTime train2_start_time = leave_time - (i ? train.travelTime[i - 1] + train.stopoverTimes[i - 1] : 0);
+				if (train2_start_time.d < train.saleDateBegin || train2_start_time.d > train.saleDateEnd) continue;
+
+				tmp.part1 = path1;
+				tmp.mid_station = train.stations[i];
+				tmp.part2.trainID = train.trainID;
+				tmp.part2.leave = train2_start_time;
+				tmp.part2.time = train.travelTime[p->second.kth - 1] - (i ? train.travelTime[i - 1] + train.stopoverTimes[i - 1] : 0);
+				tmp.part2.price = train.prices[p->second.kth - 1] - (i ? train.prices[i] : 0);
+
+				if (!has_result || cmp(tmp, res)) {
+					id1 = _id1;
+					id2 = p->second.train_id;
+					has_result = true;
+				}
+			}
+		}
+	}
+	if (!has_result)
+		return 1;
+	//	TicketsOnPath tp;
+	//	get_ticket(id1, );
+	return 0;
+}
+
 int TrainManager::buy_ticket(int id, String<30> const &S, String<30> const &T, Date date, int count, buy_ticket_result &res) {
 	auto train = get_train(id);
+	if (!train.released) return -1;
 	int iS = 0, iT = 0;
 	for (iS = 0; iS < train.stationNum; ++iS)
 		if (train.stations[iS] == S) break;

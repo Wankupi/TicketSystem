@@ -84,6 +84,7 @@ private:
 	int time = 0;// 00:00 - 23:59 : 1440 minutes
 public:
 	Time() = default;
+	explicit Time(int x) : time(x) {}
 	explicit Time(char const *str) : time(atoi(str) * 60 + atoi(str + 3)) {}
 	operator int() const { return time; }
 	friend std::ostream &operator<<(std::ostream &os, Time const &time) {
@@ -118,6 +119,7 @@ struct DateTime {
 		return DateTime(*this) -= x;
 	}
 	void add_day(int x) { d.date += x; }
+	operator int() const { return d * 24 * 60 + t; }
 };
 
 inline std::ostream &operator<<(std::ostream &os, DateTime const &time) {

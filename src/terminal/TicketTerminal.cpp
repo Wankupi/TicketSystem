@@ -268,7 +268,20 @@ int TicketTerminal::run_query_ticket(Params const &params, std::ostream &os) {
 }
 
 
-int TicketTerminal::run_query_transfer(Params const &params, std::ostream &os) { return 0; }
+int TicketTerminal::run_query_transfer(Params const &params, std::ostream &os) {
+	TrainManager::TransferResult res;
+	int ret = trains.query_transfer(params['s'], params['t'], Date{params['d']}, res,
+									(params['p'] && params['p'][0] == 'c' ? TrainManager::TransferResult::cmp_price : TrainManager::TransferResult::cmp_time));
+	if (ret == 1) {// found no train
+		os << "0";
+		return normal;
+	}
+	os << res.part1.trainID << ' ' << params['s'] << ' ' << res.part1.leave << " -> " << res.mid_station << ' ' << (res.part1.leave + res.part1.time)
+	   << ' ' << res.part1.price << ' ' << res.part1.seat << '\n';
+	os << res.part2.trainID << ' ' << res.mid_station << ' ' << res.part2.leave << " -> " << params['t'] << ' ' << (res.part2.leave + res.part2.time)
+	   << ' ' << res.part2.price << ' ' << res.part2.seat;
+	return normal;
+}
 
 
 int TicketTerminal::run_buy_ticket(Params const &params, std::ostream &os) {
@@ -319,7 +332,7 @@ int TicketTerminal::run_refund_ticket(Params const &params, std::ostream &os) {
 
 	// TODO
 	// deal with waiting list
-	std::pair<int, Date> meta{bill.train_id,bill.start};
+	std::pair<int, Date> meta{bill.train_id, bill.start};
 	auto cur = bills.get_waiting(meta.first, meta.second), end = bills.end_of_waiting();
 	kupi::vector<int> successes;
 	TrainManager::buy_ticket_result buy_res;
@@ -330,7 +343,7 @@ int TicketTerminal::run_refund_ticket(Params const &params, std::ostream &os) {
 			successes.push_back(cur->second);
 		++cur;
 	}
-	for (auto i : successes) bills.set_success(meta.first, meta.second, i);
+	for (auto i: successes) bills.set_success(meta.first, meta.second, i);
 	return ok(os);
 }
 

@@ -64,9 +64,9 @@ public:
 	struct QueryResult {
 		String<20> trainID;
 		DateTime leave;
-		int time;
-		int price;
-		int seat;
+		int time{};
+		int price{};
+		int seat{};
 		static bool cmpCost(QueryResult const &lhs, QueryResult const &rhs) {
 			return lhs.price == rhs.price ? lhs.trainID < rhs.trainID : lhs.price < rhs.price;
 		}
@@ -75,9 +75,34 @@ public:
 		}
 	};
 	int query_ticket(char const *S, char const *T, Date date, kupi::vector<QueryResult> &res);
+	struct TransferResult {
+		QueryResult part1, part2;
+		String<30> mid_station;
+		int total_time() const { return part2.leave - part1.leave + part2.time; }
+		int total_price() const { return part1.price + part2.price; }
+		static bool cmp_time(TransferResult const &A, TransferResult const &B) {
+			if (A.total_time() != B.total_time())
+				return A.total_time() < B.total_time();
+			if (A.total_price() != B.total_price())
+				return A.total_price() < B.total_price();
+			if (A.part1.trainID != B.part1.trainID)
+				return A.part1.trainID < B.part1.trainID;
+			return A.part2.trainID < B.part2.trainID;
+		}
+		static bool cmp_price(TransferResult const &A, TransferResult const &B) {
+			if (A.total_price() != B.total_price())
+				return A.total_price() < B.total_price();
+			if (A.total_time() != B.total_time())
+				return A.total_time() < B.total_time();
+			if (A.part1.trainID != B.part1.trainID)
+				return A.part1.trainID < B.part1.trainID;
+			return A.part2.trainID < B.part2.trainID;
+		}
+	};
+	int query_transfer(char const *S, char const *T, Date date, TransferResult &res, bool (*cmp)(TransferResult const &, TransferResult const &));
 
 	struct buy_ticket_result {
-		int cost;
+		int cost{};
 		Date start;
 		DateTime leave;
 		DateTime arrive;
@@ -120,7 +145,11 @@ private:
 		int running_time{};// arrival time
 		int price{};       // prefix sum
 		bool operator<(train_info_in_station const &rhs) const { return train_id < rhs.train_id; }
-		bool contain_day(Date d) const { return firstDay <= d && d <= lastDay; }
+		bool contain_leave_day(Date d) const { return firstDay <= d && d <= lastDay; }
+		bool contain_arrive_day(Date d) const {
+			DateTime s = DateTime{firstDay, leave} - stop;
+			return s.d <= d && d <= s.d + (lastDay - firstDay);
+		}
 	};
 	kupi::multibpt<String<30>, train_info_in_station> stations;
 };

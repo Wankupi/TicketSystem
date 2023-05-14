@@ -14,19 +14,17 @@ if (USE_STL)
     add_definitions(-DBPT_USE_STL)
 endif ()
 
-file(GLOB_RECURSE sources RELATIVE ${PROJECT_SOURCE_DIR} src/**.cpp)
+file(GLOB_RECURSE sources RELATIVE ${PROJECT_SOURCE_DIR} src/*/*.cpp)
 
-add_executable(main ${sources})
+add_executable(main ${sources} src/main.cpp)
+add_executable(code ${sources} src/code1.cpp)
 set(test_prefix "${PROJECT_SOURCE_DIR}/data")
 file(GLOB tests RELATIVE "${test_prefix}" data/*)
-
-message(STATUS ${tests})
 
 foreach (test-name IN ITEMS ${tests})
     if (NOT IS_DIRECTORY "${test_prefix}/${test-name}")
         continue()
     endif ()
-    message(STATUS "${test-name}")
     add_test(NAME "${test-name}"
             COMMAND bash ../run-test.sh "${test_prefix}" "${test-name}" "$<TARGET_FILE:main>"
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/run

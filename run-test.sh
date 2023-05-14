@@ -1,8 +1,8 @@
 #!/bin/bash
 
-mkdir -p "$2"
-cd $2 || exit 1
-rm -rf bill train users
+#mkdir -p "$2"
+#cd $2 || exit 1
+rm -rf bill train users *.out
 i=0
 while (true); do
 	((++i))
