@@ -78,7 +78,8 @@ enum RunResult : int { normal,
 					   train_not_found,
 					   train_already_released,
 					   time_outbound,
-					   bills_not_enough };
+					   bills_not_enough,
+					   bill_already_refunded };
 // clang-format on
 
 static inline int ok(std::ostream &os) {
@@ -152,7 +153,7 @@ int TicketTerminal::run_modify_profile(Params const &params, std::ostream &os) {
 		return fail(os, un_login);
 	int id = users.find(params['u']);
 	int privilege_cur = users.get_privilege(id_cur), privilege_tar = users.get_privilege(id);
-	if (privilege_cur < privilege_tar) return fail(os, permission_denied);
+	if (privilege_cur < privilege_tar || (privilege_cur == privilege_tar && id_cur != id)) return fail(os, permission_denied);
 	int new_privilege = User::MaxPrivilege + 1;
 	if (params['g']) {
 		new_privilege = atoi(params['g']);
@@ -185,6 +186,8 @@ void split_string_to_int(char const *start, int t[], int n) {
 
 int TicketTerminal::run_add_train(Params const &params, std::ostream &os) {
 	Train train;
+	// TODO: after debug, this line could be removed
+	memset(&train, 0, sizeof(train));
 	train.trainID = params['i'];
 	train.stationNum = atoi(params['n']);
 	train.seatNum = atoi(params['m']);
@@ -231,8 +234,11 @@ int TicketTerminal::run_query_train(Params const &params, std::ostream &os) {
 	Date d{params['d']};
 	if (int(d) < 0 || int(d) >= 92)
 		return fail(os, time_outbound);
-	if (trains.query_train(params['i'], d, train, ts) < 0)
+	int res = trains.query_train(params['i'], d, train, ts);
+	if (res == -1)
 		return fail(os, train_not_found);
+	if (res == -2)
+		return fail(os, time_outbound);
 	os << train.trainID << ' ' << train.type << '\n';
 	DateTime dt{d, train.startTime};
 	os << train.stations[0] << " xx-xx xx:xx -> " << dt << " 0 " << ts[0] << '\n';
@@ -312,11 +318,9 @@ int TicketTerminal::run_query_order(Params const &params, std::ostream &os) {
 		return fail(os, un_login);
 	auto res = bills.query_bill(user_id);
 	os << res.size();
-	constexpr const char *const status_str[] = {"[success]", "[pending]", "[refunded]"};
-	for (auto const &bill: res) {
-		os << '\n';
-		os << status_str[bill.stat] << ' ' << bill.trainID << ' ' << bill.S << ' ' << bill.leave << " -> " << bill.T << ' ' << bill.arrive << ' ' << bill.price << ' ' << bill.count;
-	}
+	for (auto const &bill: res)
+		os << '\n'
+		   << bill;
 	return normal;
 }
 
@@ -328,9 +332,11 @@ int TicketTerminal::run_refund_ticket(Params const &params, std::ostream &os) {
 	Bill bill;
 	int res = bills.refund_bill(user_id, n, bill);
 	if (res == -1) return fail(os, bills_not_enough);
-	trains.add_ticket(bill.train_id, bill.S, bill.T, bill.start, bill.count);
+	if (res == -2) return fail(os, bill_already_refunded);
+	if (res == 1)// refund a pending ticket
+		return ok(os);
 
-	// TODO
+	trains.add_ticket(bill.train_id, bill.S, bill.T, bill.start, bill.count);
 	// deal with waiting list
 	std::pair<int, Date> meta{bill.train_id, bill.start};
 	auto cur = bills.get_waiting(meta.first, meta.second), end = bills.end_of_waiting();
@@ -362,6 +368,7 @@ char const *TicketTerminal::run_result_to_string(int res) {
 	constexpr const char *error_code[] = {
 			"normal",
 			"exit",
+			"clean",
 			"file_error",
 			"params_missing",
 			"params_invalid",
@@ -371,7 +378,10 @@ char const *TicketTerminal::run_result_to_string(int res) {
 			"un_login",
 			"trainId_conflict",
 			"train_not_found",
-			"train_already_released"};
+			"train_already_released",
+			"time_outbound",
+			"bills_not_enough",
+			"bill_already_refunded"};
 	return error_code[res];
 }
 

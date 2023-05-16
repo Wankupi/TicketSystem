@@ -10,6 +10,10 @@ int BillManager::add_bill(Bill const &bill) {
 	meta.first = data.insert({bill, meta.first});
 	++meta.second;
 	head.write(bill.user_id, meta);
+
+	if (bill.stat == Bill::pending) {
+		waiting.insert({{bill.train_id, bill.start}, meta.first});
+	}
 	return 0;
 }
 
@@ -36,9 +40,12 @@ int BillManager::refund_bill(int user_id, int n, Bill &bill) {
 	for (int i = 1; i < n; ++i)
 		data.read(index, index, offsetof(decltype(data.read(0)), second));
 	data.read(index, bill, offsetof(decltype(data.read(0)), first));
+	if (bill.stat == Bill::refunded)
+		return -2;
+	bool isPending = bill.stat == Bill::pending;
 	bill.stat = Bill::refunded;
 	data.write(index, bill.stat, offsetof(decltype(data.read(0)), first) + offsetof(Bill, stat));
-	return 0;
+	return isPending;
 }
 
 void BillManager::set_success(int train_id, Date date, int bill_id) {

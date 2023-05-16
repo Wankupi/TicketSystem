@@ -20,6 +20,11 @@ struct Bill {
 				  refunded } stat;
 };
 
+inline std::ostream &operator<<(std::ostream &os, Bill const &bill) {
+	constexpr const char *const status_str[] = {"[success]", "[pending]", "[refunded]"};
+	return os << status_str[bill.stat] << ' ' << bill.trainID << ' ' << bill.S << ' ' << bill.leave << " -> " << bill.T << ' ' << bill.arrive << ' ' << bill.price << ' ' << bill.count;
+}
+
 class BillManager {
 public:
 	BillManager(std::string const &head_file, std::string const &data_file, std::string const &wait_list_file)
@@ -32,8 +37,7 @@ public:
 	 */
 	int refund_bill(int user_id, int n, Bill &bill);
 	kupi::multibpt<std::pair<int, Date>, int>::iterator get_waiting(int train_id, Date date) {
-		// do not use find because find may not return the first one in STL
-		return waiting.lower_bound({train_id, date});
+		return waiting.find({train_id, date});
 	}
 	kupi::multibpt<std::pair<int, Date>, int>::iterator end_of_waiting() {
 		return waiting.end();

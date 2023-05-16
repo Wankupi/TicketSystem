@@ -3,7 +3,7 @@ project(TicketSystem)
 
 set(CMAKE_CXX_STANDARD 20)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
 
 include_directories(src utility utility/stlite)
 
@@ -17,7 +17,7 @@ endif ()
 file(GLOB_RECURSE sources RELATIVE ${PROJECT_SOURCE_DIR} src/*/*.cpp)
 
 add_executable(main ${sources} src/main.cpp)
-add_executable(code ${sources} src/code1.cpp)
+add_executable(code ${sources} src/code.cpp)
 set(test_prefix "${PROJECT_SOURCE_DIR}/data")
 file(GLOB tests RELATIVE "${test_prefix}" data/*)
 

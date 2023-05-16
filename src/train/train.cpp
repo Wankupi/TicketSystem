@@ -82,7 +82,7 @@ int TrainManager::query_train(char const *trainID, Date date, Train &train, Tick
 	if (id <= 0) return -1;
 	trains.read(id, train);
 	if (!(train.saleDateBegin <= date && date <= train.saleDateEnd))
-		memset(&tp, 0, sizeof(int) * (train.stationNum - 1));
+		return -2;
 	else if (train.released)
 		get_ticket(id, date, tp);
 	else {
@@ -128,13 +128,16 @@ int TrainManager::query_transfer(const char *S, const char *T, Date date, Transf
 	String<30> Sa(S), Ta(T);
 	kupi::vector<int> passS, passT;
 	kupi::map<String<30>, std::vector<std::tuple<int, QueryResult>>> arr;// stationName --> { train_id, arrive_date_time }
+	//	kupi::map<int, Date> start_time_train;
 	Train train;
+
 	for (auto p = stations.find(Sa); p != stations.end() && p->first == Sa; ++p) {
 		if (!p->second.contain_leave_day(date)) continue;
 		trains.read(p->second.train_id, train);
-		DateTime start = DateTime(date, p->second.leave) - (p->second.stop + p->second.running_time);
+		//		DateTime start = DateTime(date, p->second.leave) - (p->second.stop + p->second.running_time);
+		//		start_time_train.insert({p->second.train_id, start.d});
 		for (int i = p->second.kth + 1; i < train.stationNum; ++i) {
-			DateTime arrive = start + train.travelTime[i - 1];
+			//			DateTime arrive = start + train.travelTime[i - 1];
 			arr[train.stations[i]].emplace_back(p->second.train_id, QueryResult{
 																			train.trainID,
 																			DateTime(date, p->second.leave),
@@ -159,27 +162,49 @@ int TrainManager::query_transfer(const char *S, const char *T, Date date, Transf
 				if (leave_time <= arrive_time) leave_time += 24 * 60;
 
 				DateTime train2_start_time = leave_time - (i ? train.travelTime[i - 1] + train.stopoverTimes[i - 1] : 0);
-				if (train2_start_time.d < train.saleDateBegin || train2_start_time.d > train.saleDateEnd) continue;
+				if (train2_start_time.d < train.saleDateBegin) {
+					int dis = train.saleDateBegin - train2_start_time.d;
+					train2_start_time += dis * 24 * 60;
+					leave_time += dis * 24 * 60;
+				}
+				if (train2_start_time.d > train.saleDateEnd)
+					continue;
 
 				tmp.part1 = path1;
 				tmp.mid_station = train.stations[i];
 				tmp.part2.trainID = train.trainID;
-				tmp.part2.leave = train2_start_time;
+				tmp.part2.leave = leave_time;
 				tmp.part2.time = train.travelTime[p->second.kth - 1] - (i ? train.travelTime[i - 1] + train.stopoverTimes[i - 1] : 0);
-				tmp.part2.price = train.prices[p->second.kth - 1] - (i ? train.prices[i] : 0);
+				tmp.part2.price = train.prices[p->second.kth - 1] - (i ? train.prices[i - 1] : 0);
 
 				if (!has_result || cmp(tmp, res)) {
 					id1 = _id1;
 					id2 = p->second.train_id;
 					has_result = true;
+					res = tmp;
 				}
 			}
 		}
 	}
 	if (!has_result)
 		return 1;
-	//	TicketsOnPath tp;
-	//	get_ticket(id1, );
+	TicketsOnPath tp;
+	auto load_ticket_number = [this, &train, &tp](int train_id, String<30> const &S, String<30> const &T, DateTime leaveTime) -> int {
+		trains.read(train_id, train);
+		int iS = 0, iT = 0;
+		for (iS = 0; train.stations[iS] != S; ++iS)
+			;
+		for (iT = iS + 1; train.stations[iT] != T; ++iT)
+			;
+		DateTime startTime = leaveTime - (iS ? train.travelTime[iS - 1] + train.stopoverTimes[iS - 1] : 0);
+		get_ticket(train_id, startTime.d, tp);
+		int num = 0x3f3f3f3f;
+		for (int i = iS; i < iT; ++i)
+			if (tp[i] < num) num = tp[i];
+		return num;
+	};
+	res.part1.seat = load_ticket_number(id1, Sa, res.mid_station, res.part1.leave);
+	res.part2.seat = load_ticket_number(id2, res.mid_station, Ta, res.part2.leave);
 	return 0;
 }
 
@@ -189,16 +214,15 @@ int TrainManager::buy_ticket(int id, String<30> const &S, String<30> const &T, D
 	int iS = 0, iT = 0;
 	for (iS = 0; iS < train.stationNum; ++iS)
 		if (train.stations[iS] == S) break;
-	assert(iS < train.stationNum);
 	for (iT = iS + 1; iT < train.stationNum; ++iT)
 		if (train.stations[iT] == T) break;
-	assert(iT < train.stationNum);
+	if (iT >= train.stationNum) return -2;
 
 	DateTime startTime{train.saleDateBegin, train.startTime},
 			leave = startTime + (iS ? train.travelTime[iS - 1] + train.stopoverTimes[iS - 1] : 0),
 			arrive = startTime + train.travelTime[iT - 1];
 	int distance = int(date) - (leave.d);
-	if (distance < 0 || distance > train.saleDateEnd - train.saleDateBegin + 1)
+	if (distance < 0 || distance > train.saleDateEnd - train.saleDateBegin)
 		return -1;
 	startTime.add_day(distance);
 	leave.add_day(distance);

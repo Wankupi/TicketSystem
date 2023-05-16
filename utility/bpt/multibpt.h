@@ -3,11 +3,12 @@
 #ifdef BPT_USE_STL
 #include <fstream>
 #include <map>
+#include <set>
 namespace kupi {
 template<typename Key, typename Val>
-class multibpt : public std::multimap<Key, Val> {
+class multibpt {
 public:
-	explicit multibpt(std::string const &tr_name) : std::multimap<Key, Val>{}, leave_file{tr_name + ".bpt"} {
+	explicit multibpt(std::string const &tr_name) : leave_file{tr_name + ".bpt"} {
 		std::ifstream file(leave_file);
 		if (!file) return;
 		std::pair<Key, Val> t;
@@ -16,24 +17,41 @@ public:
 		file.seekg(0);
 		for (int i = 0; i < siz; ++i) {
 			file.read(reinterpret_cast<char *>(&t), sizeof(t));
-			this->insert(t);
+			data.insert(t);
 		}
 	}
 	~multibpt() {
 		std::ofstream file(leave_file, std::ios::trunc);
 		if (!file) return;
-		for (auto const &x: *this) {
+		for (auto const &x: data) {
 			file.write(reinterpret_cast<char const *>(&x), sizeof(x));
 		}
 	}
+	void insert(std::pair<Key, Val> const &x) {
+		data.insert(x);
+	}
 	void erase(Key const &key, Val const &val) {
-		auto [beg, ed] = this->equal_range(key);
-		while (beg != ed && beg->second != val) ++beg;
-		if (beg != ed)
-			this->std::multimap<Key, Val>::erase(beg);
+		//		auto [beg, ed] = this->equal_range(key);
+		//		while (beg != ed && beg->second != val) ++beg;
+		//		if (beg != ed)
+		//			this->std::multimap<Key, Val>::erase(beg);
+		data.erase({key, val});
+	}
+	using iterator = std::set<std::pair<Key, Val>>::iterator;
+	iterator find(Key const &key) const {
+		auto p = data.lower_bound({key, {}});
+		if (p != data.end() && p->first == key) return p;
+		return data.end();
+	}
+	iterator lower_bound(Key const &key) {
+		return data.lower_bound({key, {}});
+	}
+	iterator end() const {
+		return data.end();
 	}
 
 private:
+	std::set<std::pair<Key, Val>> data;
 	std::string leave_file;
 };
 }// namespace kupi

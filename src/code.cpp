@@ -3,7 +3,7 @@
 #include <iostream>
 
 char buff[1024 * 4];
-
+char stepStr[20];
 void clear() {
     std::filesystem::remove_all("users");
     std::filesystem::remove_all("train");
@@ -15,7 +15,7 @@ int run(std::istream &is, std::ostream &os) {
     ticket::TrainManager tm("train/main.db", "train/ticket.db", "train/trainID", "train/station");
     ticket::BillManager bm("bill/head.db", "bill/main.db", "bill/wait");
     ticket::TicketTerminal term(um, tm, bm);
-    char step[20];
+    char (&step)[20] = stepStr;
     while (is >> step) {
         os << step << ' ';
         int num = atoi(step + 1);
@@ -30,6 +30,7 @@ int run(std::istream &is, std::ostream &os) {
 }
 
 int main(int argc, char *argv[]) {
+	freopen("t.txt", "w", stderr);
     if (argc < 2) {
         std::cout << "params not enough";
         return 1;
@@ -37,7 +38,7 @@ int main(int argc, char *argv[]) {
     clear();
     std::ios::sync_with_stdio(false);
     std::cin.tie(0);
-    for (int i = 1; i <= 3; ++i) {
+    for (int i = 1; i <= 30; ++i) {
         std::ifstream is(std::string(argv[1]) + std::to_string(i) + ".in");
         if (!is) break;
         std::ofstream os(std::to_string(i) + ".out");

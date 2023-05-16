@@ -72,6 +72,10 @@ public:
 			++month;
 			day -= 31;
 		}
+		if (day >= 31) {
+			++month;
+			day -= 31;
+		}
 		return os << std::setfill('0') << std::setw(2) << month << '-'
 				  << std::setw(2) << day + 1;
 	}
@@ -125,3 +129,6 @@ struct DateTime {
 inline std::ostream &operator<<(std::ostream &os, DateTime const &time) {
 	return os << time.d << ' ' << time.t;
 }
+
+
+extern char stepStr[20];
