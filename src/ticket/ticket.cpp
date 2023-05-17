@@ -45,6 +45,8 @@ int BillManager::refund_bill(int user_id, int n, Bill &bill) {
 	bool isPending = bill.stat == Bill::pending;
 	bill.stat = Bill::refunded;
 	data.write(index, bill.stat, offsetof(decltype(data.read(0)), first) + offsetof(Bill, stat));
+	if (isPending)
+		waiting.erase({{bill.train_id, bill.start}, index});
 	return isPending;
 }
 

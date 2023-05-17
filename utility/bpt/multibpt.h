@@ -30,6 +30,9 @@ public:
 	void insert(std::pair<Key, Val> const &x) {
 		data.insert(x);
 	}
+	void erase(std::pair<Key, Val> const &x) {
+		data.erase(x);
+	}
 	void erase(Key const &key, Val const &val) {
 		//		auto [beg, ed] = this->equal_range(key);
 		//		while (beg != ed && beg->second != val) ++beg;

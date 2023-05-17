@@ -157,9 +157,11 @@ int TrainManager::query_transfer(const char *S, const char *T, Date date, Transf
 			if (st == arr.end()) continue;
 
 			for (auto [_id1, path1]: st->second) {
+				if (_id1 == p->second.train_id)
+					continue;
 				DateTime arrive_time = path1.leave + path1.time;
-				DateTime leave_time{arrive_time.d, Time(train.startTime + (i ? train.travelTime[i - 1] + train.stopoverTimes[i - 1] : 0))};
-				if (leave_time <= arrive_time) leave_time += 24 * 60;
+				DateTime leave_time{arrive_time.d, Time((train.startTime + (i ? train.travelTime[i - 1] + train.stopoverTimes[i - 1] : 0)) % (24 * 60))};
+				if (leave_time < arrive_time) leave_time += 24 * 60;
 
 				DateTime train2_start_time = leave_time - (i ? train.travelTime[i - 1] + train.stopoverTimes[i - 1] : 0);
 				if (train2_start_time.d < train.saleDateBegin) {
@@ -211,6 +213,8 @@ int TrainManager::query_transfer(const char *S, const char *T, Date date, Transf
 int TrainManager::buy_ticket(int id, String<30> const &S, String<30> const &T, Date date, int count, buy_ticket_result &res) {
 	auto train = get_train(id);
 	if (!train.released) return -1;
+	if (train.seatNum < count)
+		return -3;
 	int iS = 0, iT = 0;
 	for (iS = 0; iS < train.stationNum; ++iS)
 		if (train.stations[iS] == S) break;

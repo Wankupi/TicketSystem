@@ -108,13 +108,13 @@ struct DateTime {
 	}
 	DateTime &operator-=(int x) {
 		t.time -= x;
-		d.date -= (-t.time + 24 * 60) / (24 * 60);
+		d.date -= (-t.time + 24 * 60 - 1) / (24 * 60);
 		t.time %= 24 * 60;
 		if (t.time < 0) t.time += 24 * 60;
 		return *this;
 	}
 	int operator-(DateTime const &B) const {
-		return (B.d.date - d.date) * 24 * 60 + (B.t.time - t.time);
+		return (d.date - B.d.date) * 24 * 60 + (t.time - B.t.time);
 	}
 	DateTime operator+(int x) const {
 		return DateTime(*this) += x;
@@ -132,3 +132,4 @@ inline std::ostream &operator<<(std::ostream &os, DateTime const &time) {
 
 
 extern char stepStr[20];
+extern int stepNum;

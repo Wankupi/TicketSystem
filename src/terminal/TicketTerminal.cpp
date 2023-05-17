@@ -152,6 +152,8 @@ int TicketTerminal::run_modify_profile(Params const &params, std::ostream &os) {
 	if (!loginList.count(id_cur))
 		return fail(os, un_login);
 	int id = users.find(params['u']);
+	if (id <= 0)
+		return fail(os, user_not_found);
 	int privilege_cur = users.get_privilege(id_cur), privilege_tar = users.get_privilege(id);
 	if (privilege_cur < privilege_tar || (privilege_cur == privilege_tar && id_cur != id)) return fail(os, permission_denied);
 	int new_privilege = User::MaxPrivilege + 1;
