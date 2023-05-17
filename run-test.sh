@@ -20,4 +20,5 @@ while (true); do
 		echo -e "\033[31mCase ${i}: Output is not correct\033[0m"
 		exit 1
 	fi
+	echo "${i} ok"
 done

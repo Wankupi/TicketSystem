@@ -1,15 +1,6 @@
 #include "user.h"
 namespace ticket {
 
-// user.username
-static bool check_username(char const *str) { return true; }
-// user.name
-static bool check_name(char const *str) { return true; }
-// user.password
-static bool check_visible(char const *str) { return true; }
-// user.mail
-static bool check_mail(char const *str) { return true; }
-
 std::ostream &operator<<(std::ostream &os, User const &user) {
 	return os << user.username << ' ' << user.name << ' ' << user.mail << ' ' << int(user.privilege);
 }
@@ -30,7 +21,6 @@ int UserManager::find(const char *username) {
 int UserManager::add_user(const char *username, const char *password, const char *name, const char *mail, unsigned char privilege) {
 	if (find(username)) return -1;
 	if (!username || !password || !name || !mail || privilege > User::MaxPrivilege) return -2;
-	if (!(check_username(username) && check_visible(password) && check_name(name) && check_mail(mail))) return -3;
 	User user{username, password, name, mail, privilege};
 	int id = data.insert(user);
 	if (id) {
@@ -41,7 +31,6 @@ int UserManager::add_user(const char *username, const char *password, const char
 }
 
 std::optional<User> UserManager::set(int id, const char *username, const char *password, const char *name, const char *mail, unsigned char privilege) {
-	if ((username && !check_username(username)) || (password && !check_visible(password)) || (name && !check_name(name)) || (mail && !check_mail(mail))) return std::nullopt;
 	User user{data.read(id)};
 	if (username) {
 		name2id.erase(user.username);

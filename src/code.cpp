@@ -4,6 +4,8 @@
 
 char buff[1024 * 4];
 char stepStr[20];
+int stepNum = 0;
+
 void clear() {
     std::filesystem::remove_all("users");
     std::filesystem::remove_all("train");
@@ -18,7 +20,7 @@ int run(std::istream &is, std::ostream &os) {
     char (&step)[20] = stepStr;
     while (is >> step) {
         os << step << ' ';
-        int num = atoi(step + 1);
+        stepNum = atoi(step + 1);
         is.get();
         is.getline(buff, sizeof(buff));
         int r = term.run(buff, os);

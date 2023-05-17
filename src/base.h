@@ -29,11 +29,6 @@ struct String : public std::array<char, N> {
 		else
 			return std::string(this->data());
 	}
-	bool allzero() const {
-		for (int i = 0; i < N; ++i)
-			if ((*this)[i]) return false;
-		return true;
-	}
 };
 
 template<std::size_t N>
@@ -129,7 +124,3 @@ struct DateTime {
 inline std::ostream &operator<<(std::ostream &os, DateTime const &time) {
 	return os << time.d << ' ' << time.t;
 }
-
-
-extern char stepStr[20];
-extern int stepNum;

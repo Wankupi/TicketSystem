@@ -3,10 +3,9 @@ project(TicketSystem)
 
 set(CMAKE_CXX_STANDARD 20)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 include_directories(src utility utility/stlite)
-
 
 option(USE_STL "is use stl as bottom level data structure" ON)
 if (USE_STL)
