@@ -145,6 +145,7 @@ private:
 		int running_time{};// arrival time
 		int price{};       // prefix sum
 		bool operator<(train_info_in_station const &rhs) const { return train_id < rhs.train_id; }
+		bool operator==(train_info_in_station const &rhs) const { return train_id == rhs.train_id; }
 		bool contain_leave_day(Date d) const { return firstDay <= d && d <= lastDay; }
 		bool contain_arrive_day(Date d) const {
 			DateTime s = DateTime{firstDay, leave} - stop;

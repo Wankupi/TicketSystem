@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef BPT_USE_STL
+#ifdef MULTIBPT_USE_STL
 #include <fstream>
 #include <map>
 #include <set>
@@ -30,14 +30,13 @@ public:
 	void insert(std::pair<Key, Val> const &x) {
 		data.insert(x);
 	}
+	void insert(Key const &key, Val const &val) {
+		data.insert({key, val});
+	}
 	void erase(std::pair<Key, Val> const &x) {
 		data.erase(x);
 	}
 	void erase(Key const &key, Val const &val) {
-		//		auto [beg, ed] = this->equal_range(key);
-		//		while (beg != ed && beg->second != val) ++beg;
-		//		if (beg != ed)
-		//			this->std::multimap<Key, Val>::erase(beg);
 		data.erase({key, val});
 	}
 	using iterator = std::set<std::pair<Key, Val>>::iterator;
@@ -70,27 +69,8 @@ namespace kupi {
 
 template<typename Key, typename Val, template<typename> class Array = FileCache>
 class multibpt {
-public:
-	multibpt() = default;
-	explicit multibpt(std::string const &tr_name) : nodes(tr_name + ".nodes"), leave(tr_name + ".leave") {}
-	void insert(Key const &index, Val const &val);
-	void erase(Key const &index, Val const &val);
-	vector<Val> find(Key const &index);
-
 private:
-	struct pair {
-		Key key;
-		Val val;
-		friend bool operator<(pair const &lhs, pair const &rhs) {
-			return lhs.key == rhs.key ? lhs.val < rhs.val : lhs.key < rhs.key;
-		}
-		friend bool operator==(pair const &lhs, pair const &rhs) {
-			return lhs.key == rhs.key && lhs.val == rhs.val;
-		}
-		friend bool operator!=(pair const &lhs, pair const &rhs) {
-			return lhs.key != rhs.key || lhs.val != rhs.val;
-		}
-	};
+	using pair = std::pair<Key, Val>;
 	constexpr static int BLOCK_SIZE = 4096;
 	struct node_meta {
 		int size;
@@ -105,7 +85,6 @@ private:
 		constexpr static int M = (BLOCK_SIZE - sizeof(node_meta)) / sizeof(node_data);
 		node_meta header;
 		node_data data[M];
-		// char padding[BLOCK_SIZE - sizeof(header) - sizeof(data)];
 		node_data *end() { return data + header.size; }
 	};
 	struct leaf_meta {
@@ -121,6 +100,53 @@ private:
 		pair data[M];
 	};
 
+public:
+	class iterator {
+		friend class multibpt;
+		iterator(pair *_ptr, leaf *_leaf, Array<leaf> *ar) : ptr{_ptr}, p_leaf{_leaf}, leave{ar} {}
+
+	public:
+		using value_type = std::pair<Key const, Val>;
+		using pointer = value_type *;
+		using reference = value_type &;
+		reference operator*() { return *reinterpret_cast<pointer>(ptr); }
+		pointer operator->() { return reinterpret_cast<pointer>(ptr); }
+		iterator &operator++() {
+			if (!ptr) return *this;
+			if (ptr != &p_leaf->back())
+				++ptr;
+			else {
+				if (p_leaf->header.next) {
+					p_leaf = (*leave)[p_leaf->header.next];
+					ptr = p_leaf->data;
+				}
+				else {
+					p_leaf = nullptr;
+					ptr = nullptr;
+				}
+			}
+			return *this;
+		}
+		bool operator==(iterator const &rhs) const { return ptr == rhs.ptr; }
+		bool operator!=(iterator const &rhs) const { return ptr != rhs.ptr; }
+
+	private:
+		pair *ptr;
+		leaf *p_leaf;
+		Array<leaf> *leave;
+	};
+
+public:
+	multibpt() = default;
+	multibpt(std::string const &tr_name) : nodes(tr_name + ".nodes"), leave(tr_name + ".leave") {}
+	void insert(Key const &index, Val const &val);
+	void insert(std::pair<Key, Val> const &x) { insert(x.first, x.second); }
+	void erase(Key const &index, Val const &val);
+	void erase(std::pair<Key, Val> const &x) { erase(x.first, x.second); }
+	iterator find(Key const &index);
+	iterator end() { return {nullptr, nullptr, &leave}; }
+	vector<Val> find_all(Key const &index);
+
 private:
 	// root is fixed as nodes[1], or leave[1]
 	Array<node> nodes;
@@ -129,6 +155,9 @@ private:
 private:
 	using node_ptr = decltype(nodes[1]);
 	using leaf_ptr = decltype(leave[1]);
+	static bool cmp_key_node(node_data const &A, node_data const &B) { return A.key.first < B.key.first; }
+	static bool cmp_node(node_data const &A, node_data const &B) { return A.key < B.key; }
+	static bool cmp_key_leaf(pair const &A, pair const &B) { return A.first < B.first; }
 	/**
 	 * @param x key
 	 * @param st the nodes will be stored in it
@@ -173,9 +202,29 @@ private:
 };
 
 template<typename Key, typename Val, template<typename> class Array>
-vector<Val> multibpt<Key, Val, Array>::find(Key const &index) {
-	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key.key < B.key.key; };
-	constexpr auto cmp_key_leaf = [](pair const &A, pair const &B) { return A.key < B.key; };
+multibpt<Key, Val, Array>::iterator multibpt<Key, Val, Array>::find(Key const &index) {
+	if (leave.empty()) return end();
+	pair x{index, {}};
+	node_data X{x, 0};
+	auto p = nodes.empty() ? nullptr : nodes[1];
+	auto ptr = nodes.empty() ? leave[1] : nullptr;
+	while (p) {
+		auto *k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
+		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
+		if (p->header.is_leaf) {
+			ptr = leave[next];
+			break;
+		}
+		p = nodes[next];
+	}
+	auto k = lower_bound(ptr->data, ptr->data + ptr->header.size, x, cmp_key_leaf);
+	if (k == ptr->data + ptr->header.size || k->first != index)
+		return end();
+	return {k, ptr, &leave};
+}
+
+template<typename Key, typename Val, template<typename> class Array>
+vector<Val> multibpt<Key, Val, Array>::find_all(Key const &index) {
 	if (leave.empty()) return {};
 	pair x{index, {}};
 	node_data X{x, 0};
@@ -193,8 +242,8 @@ vector<Val> multibpt<Key, Val, Array>::find(Key const &index) {
 	vector<Val> res;
 	auto k = lower_bound(ptr->data, ptr->data + ptr->header.size, x, cmp_key_leaf);
 	while (ptr) {
-		while (k < ptr->data + ptr->header.size && index == k->key) {
-			res.emplace_back(k->val);
+		while (k < ptr->data + ptr->header.size && index == k->first) {
+			res.emplace_back(k->second);
 			++k;
 		}
 		if (k != ptr->data + ptr->header.size || !ptr->header.next)
@@ -211,9 +260,8 @@ typename multibpt<Key, Val, Array>::leaf_ptr multibpt<Key, Val, Array>::find_lea
 		return leave[1];// tree is not empty
 	node_data X{x, 0};
 	node_ptr p = nodes[1];
-	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key < B.key; };
 	while (true) {
-		auto k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
+		auto k = lower_bound(p->data, p->data + p->header.size, X, cmp_node);
 		st.push_back({p, k});
 		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
 		if (p->header.is_leaf)

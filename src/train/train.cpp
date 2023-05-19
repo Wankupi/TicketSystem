@@ -10,7 +10,7 @@ int TrainManager::add_train(Train const &train) {
 	int id = trains.insert(train);
 	if (id <= 0)
 		return -2;
-	trainID2int.insert({train.trainID, id});
+	trainID2int.insert(train.trainID, id);
 	return id;
 }
 
@@ -40,7 +40,7 @@ int TrainManager::release_train(char const *trainID) {
 
 	train_info_in_station info{id, first.d, last.d, first.t, 0, 0, 0, 0};
 	for (int i = 0; i < train.stationNum - 1; ++i) {
-		stations.insert({train.stations[i], info});
+		stations.insert(train.stations[i], info);
 		++info.kth;
 		info.running_time = train.travelTime[i];
 		info.stop = train.stopoverTimes[i];
@@ -49,7 +49,7 @@ int TrainManager::release_train(char const *trainID) {
 		info.lastDay = (last + train.travelTime[i] + train.stopoverTimes[i]).d;
 		info.leave = (first + train.travelTime[i] + train.stopoverTimes[i]).t;
 	}
-	stations.insert({train.stations[train.stationNum - 1], info});
+	stations.insert(train.stations[train.stationNum - 1], info);
 
 	Tickets tick{};
 	memset(&tick, 0, sizeof(tick));
@@ -97,13 +97,14 @@ int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::ve
 	String<30> Sa(S), Ta(T);
 	QueryResult qr;// put it outside the for loop to reduce allocate...
 	TicketsOnPath tp;
-	auto p1 = stations.find(Sa), p2 = stations.find(Ta);
-	while (p1 != stations.end() && p2 != stations.end() && p1->first == Sa && p2->first == Ta) {
-		if (p1->second < p2->second) ++p1;
-		else if (p2->second < p1->second)
+	auto v1 = stations.find_all(Sa), v2 = stations.find_all(Ta);
+	auto p1 = v1.begin(), p2 = v2.begin();
+	while (p1 != v1.end() && p2 != v2.end()) {
+		if (p1->train_id < p2->train_id) ++p1;
+		else if (p2->train_id < p1->train_id)
 			++p2;
 		else {
-			auto const &t1 = p1->second, &t2 = p2->second;
+			auto const &t1 = *p1, &t2 = *p2;
 			++p1;
 			++p2;
 			if (!t1.contain_leave_day(date) || t2.kth <= t1.kth) continue;
@@ -126,18 +127,13 @@ int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::ve
 
 int TrainManager::query_transfer(const char *S, const char *T, Date date, TransferResult &res, bool (*cmp)(TransferResult const &, TransferResult const &)) {
 	String<30> Sa(S), Ta(T);
-	kupi::vector<int> passS, passT;
 	kupi::map<String<30>, std::vector<std::tuple<int, QueryResult>>> arr;// stationName --> { train_id, arrive_date_time }
-	//	kupi::map<int, Date> start_time_train;
 	Train train;
 
 	for (auto p = stations.find(Sa); p != stations.end() && p->first == Sa; ++p) {
 		if (!p->second.contain_leave_day(date)) continue;
 		trains.read(p->second.train_id, train);
-		//		DateTime start = DateTime(date, p->second.leave) - (p->second.stop + p->second.running_time);
-		//		start_time_train.insert({p->second.train_id, start.d});
 		for (int i = p->second.kth + 1; i < train.stationNum; ++i) {
-			//			DateTime arrive = start + train.travelTime[i - 1];
 			arr[train.stations[i]].emplace_back(p->second.train_id, QueryResult{
 																			train.trainID,
 																			DateTime(date, p->second.leave),
@@ -150,7 +146,6 @@ int TrainManager::query_transfer(const char *S, const char *T, Date date, Transf
 	int id1 = 0, id2 = 0;
 	bool has_result = false;
 	for (auto p = stations.find(Ta); p != stations.end() && p->first == Ta; ++p) {
-		//		if (!p->second.contain_arrive_day())
 		trains.read(p->second.train_id, train);
 		for (int i = 0; i < p->second.kth; ++i) {
 			auto st = arr.find(train.stations[i]);

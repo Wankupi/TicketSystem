@@ -24,7 +24,7 @@ int UserManager::add_user(const char *username, const char *password, const char
 	User user{username, password, name, mail, privilege};
 	int id = data.insert(user);
 	if (id) {
-		name2id.insert({username, id});
+		name2id.insert(username, id);
 		++siz;
 	}
 	return id;
@@ -35,7 +35,7 @@ std::optional<User> UserManager::set(int id, const char *username, const char *p
 	if (username) {
 		name2id.erase(user.username);
 		user.username = username;
-		name2id.insert({user.username, id});
+		name2id.insert(user.username, id);
 	}
 	if (password) user.password = password;
 	if (name) user.name = name;
