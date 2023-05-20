@@ -100,16 +100,19 @@ int TrainManager::query_train(char const *trainID, Date date, Train &train, Tick
 
 int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::vector<QueryResult> &res) {
 	res.clear();
+	auto hT = hash_String(T);
 	QueryResult qr;// put it outside the for loop to reduce allocate...
 	TicketsOnPath tp;
-	auto v1 = stations.find_all(hash_String(S)), v2 = stations.find_all(hash_String(T));
-	auto p1 = v1.begin(), p2 = v2.begin();
-	while (p1 != v1.end() && p2 != v2.end()) {
-		if (p1->train_id < p2->train_id) ++p1;
-		else if (p2->train_id < p1->train_id)
+	auto v1 = stations.find_all(hash_String(S));
+	auto p1 = v1.begin();
+	auto p2 = stations.find(hT);
+
+	while (p1 != v1.end() && p2 != stations.end() && p2->first == hT) {
+		if (p1->train_id < p2->second.train_id) ++p1;
+		else if (p2->second.train_id < p1->train_id)
 			++p2;
 		else {
-			auto const &t1 = *p1, &t2 = *p2;
+			auto const &t1 = *p1, &t2 = p2->second;
 			++p1;
 			++p2;
 			if (!t1.contain_leave_day(date) || t2.kth <= t1.kth) continue;
