@@ -1,6 +1,7 @@
 #pragma once
 
 #ifdef MULTIBPT_USE_STL
+#include "vector.h"
 #include <fstream>
 #include <map>
 #include <set>
@@ -44,6 +45,15 @@ public:
 		auto p = data.lower_bound({key, {}});
 		if (p != data.end() && p->first == key) return p;
 		return data.end();
+	}
+	vector<Val> find_all(Key const &key) const {
+		vector<Val> res;
+		auto p = data.lower_bound({key, {}});
+		while (p != data.end() && p->first == key) {
+			res.emplace_back(p->second);
+			++p;
+		}
+		return res;
 	}
 	iterator lower_bound(Key const &key) {
 		return data.lower_bound({key, {}});
