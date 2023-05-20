@@ -1,12 +1,25 @@
 #include "train.h"
 #include "map.h"
-
 namespace ticket {
+
+unsigned long long hash_String(char const *s) {
+	unsigned long long res = 0;
+	while (*s)
+		res = res * 631 + *s++;
+	return res;
+}
+
+template<unsigned long N>
+inline unsigned long long hash_String(String<N> const &str) {
+	unsigned long long res = 0;
+	char const *s = str.data();
+	for (int i = 0; i < N && *s; ++i) res = res * 631 + *s++;
+	return res;
+}
 
 int TrainManager::add_train(Train const &train) {
 	if (trainID2int.find(train.trainID) != trainID2int.end())
 		return -1;
-	// there should be some checks
 	int id = trains.insert(train);
 	if (id <= 0)
 		return -2;
@@ -20,14 +33,6 @@ int TrainManager::find(char const *trainID) {
 	return res->second;
 }
 
-inline std::pair<int, bool> TrainManager::get_id_and_released(char const *trainID) {
-	int id = find(trainID);
-	if (id <= 0) return {0, false};
-	bool isReleased = false;
-	trains.read(id, isReleased, offsetof(Train, released));
-	return {id, isReleased};
-}
-
 int TrainManager::release_train(char const *trainID) {
 	int id = find(trainID);
 	if (id <= 0) return -1;
@@ -35,12 +40,11 @@ int TrainManager::release_train(char const *trainID) {
 	if (train.released) return -2;
 	trains.write(id, train.released = true, offsetof(Train, released));
 
-	// do some other works
 	DateTime first{train.saleDateBegin, train.startTime}, last{train.saleDateEnd, train.startTime};
 
 	train_info_in_station info{id, first.d, last.d, first.t, 0, 0, 0, 0};
 	for (int i = 0; i < train.stationNum - 1; ++i) {
-		stations.insert(train.stations[i], info);
+		stations.insert(hash_String(train.stations[i]), info);
 		++info.kth;
 		info.running_time = train.travelTime[i];
 		info.stop = train.stopoverTimes[i];
@@ -49,7 +53,7 @@ int TrainManager::release_train(char const *trainID) {
 		info.lastDay = (last + train.travelTime[i] + train.stopoverTimes[i]).d;
 		info.leave = (first + train.travelTime[i] + train.stopoverTimes[i]).t;
 	}
-	stations.insert(train.stations[train.stationNum - 1], info);
+	stations.insert(hash_String(train.stations[train.stationNum - 1]), info);
 
 	Tickets tick{};
 	memset(&tick, 0, sizeof(tick));
@@ -62,18 +66,20 @@ int TrainManager::release_train(char const *trainID) {
 }
 
 int TrainManager::delete_train(char const *trainID) {
-	auto [id, isReleased] = get_id_and_released(trainID);
+	int id = find(trainID);
 	if (id <= 0) return -1;
+	bool isReleased = false;
+	trains.read(id, isReleased, offsetof(Train, released));
 	if (isReleased) return -2;
 	trainID2int.erase(trainID);
 	return 0;
 }
 
-void TrainManager::get_ticket(int id, Date d, TicketsOnPath &tp) {
+inline void TrainManager::get_ticket(int id, Date d, TicketsOnPath &tp) {
 	tickets.read(id, tp, sizeof(TicketsOnPath) * (int(d)));
 }
 
-void TrainManager::set_ticket(int id, Date d, TicketsOnPath &tp) {
+inline void TrainManager::set_ticket(int id, Date d, TicketsOnPath &tp) {
 	tickets.write(id, tp, sizeof(TicketsOnPath) * (int(d)));
 }
 
@@ -94,10 +100,9 @@ int TrainManager::query_train(char const *trainID, Date date, Train &train, Tick
 
 int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::vector<QueryResult> &res) {
 	res.clear();
-	String<30> Sa(S), Ta(T);
 	QueryResult qr;// put it outside the for loop to reduce allocate...
 	TicketsOnPath tp;
-	auto v1 = stations.find_all(Sa), v2 = stations.find_all(Ta);
+	auto v1 = stations.find_all(hash_String(S)), v2 = stations.find_all(hash_String(T));
 	auto p1 = v1.begin(), p2 = v2.begin();
 	while (p1 != v1.end() && p2 != v2.end()) {
 		if (p1->train_id < p2->train_id) ++p1;
@@ -126,11 +131,11 @@ int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::ve
 }
 
 int TrainManager::query_transfer(const char *S, const char *T, Date date, TransferResult &res, bool (*cmp)(TransferResult const &, TransferResult const &)) {
-	String<30> Sa(S), Ta(T);
+	unsigned long long hS = hash_String(S), hT = hash_String(T);
 	kupi::map<String<30>, std::vector<std::tuple<int, QueryResult>>> arr;// stationName --> { train_id, arrive_date_time }
 	Train train;
 
-	for (auto p = stations.find(Sa); p != stations.end() && p->first == Sa; ++p) {
+	for (auto p = stations.find(hS); p != stations.end() && p->first == hS; ++p) {
 		if (!p->second.contain_leave_day(date)) continue;
 		trains.read(p->second.train_id, train);
 		for (int i = p->second.kth + 1; i < train.stationNum; ++i) {
@@ -145,7 +150,7 @@ int TrainManager::query_transfer(const char *S, const char *T, Date date, Transf
 	TransferResult tmp;
 	int id1 = 0, id2 = 0;
 	bool has_result = false;
-	for (auto p = stations.find(Ta); p != stations.end() && p->first == Ta; ++p) {
+	for (auto p = stations.find(hT); p != stations.end() && p->first == hT; ++p) {
 		trains.read(p->second.train_id, train);
 		for (int i = 0; i < p->second.kth; ++i) {
 			auto st = arr.find(train.stations[i]);
@@ -200,8 +205,8 @@ int TrainManager::query_transfer(const char *S, const char *T, Date date, Transf
 			if (tp[i] < num) num = tp[i];
 		return num;
 	};
-	res.part1.seat = load_ticket_number(id1, Sa, res.mid_station, res.part1.leave);
-	res.part2.seat = load_ticket_number(id2, res.mid_station, Ta, res.part2.leave);
+	res.part1.seat = load_ticket_number(id1, S, res.mid_station, res.part1.leave);
+	res.part2.seat = load_ticket_number(id2, res.mid_station, T, res.part2.leave);
 	return 0;
 }
 

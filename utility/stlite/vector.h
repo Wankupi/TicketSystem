@@ -19,6 +19,7 @@ private:
 		iterator_base_cmp(T *cur) : cur(cur) {}
 		bool operator==(const iterator_base_cmp &rhs) const { return cur == rhs.cur; }
 		bool operator!=(const iterator_base_cmp &rhs) const { return cur != rhs.cur; }
+		bool operator<(const iterator_base_cmp &rhs) const { return cur < rhs.cur; }
 
 	protected:
 		T *cur;
@@ -108,7 +109,12 @@ public:
 		: start{other.start}, finish{other.finish}, bound{other.bound}, alloc{std::move(other.alloc)} {
 		other.start = other.finish = other.bound = nullptr;
 	}
-
+	vector(size_t siz, T const &init_val) : vector() {
+		start = alloc.allocate(siz);
+		finish = bound = start + siz;
+		for (T *cur = start; cur != finish; ++cur)
+			new (cur) T{init_val};
+	}
 	~vector() { clear(); }
 
 	vector &operator=(const vector &other) {
@@ -251,6 +257,18 @@ public:
 
 	operator std::vector<T>() const {
 		return std::vector<T>{start, finish};
+	}
+
+	void reserve(size_t size) {
+		T *new_place = alloc.allocate(size);
+		size_t siz = finish - start;
+		copy_or_move(start, start + std::min(siz, size), new_place);
+		for (T *cur = start + std::min(siz, size); cur != finish; ++cur)
+			cur->~T();
+		alloc.deallocate(start, bound - start);
+		start = new_place;
+		finish = start + std::min(siz, size);
+		bound = start + size;
 	}
 
 private:

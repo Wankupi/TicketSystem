@@ -256,9 +256,9 @@ int TicketTerminal::run_query_train(Params const &params, std::ostream &os) {
 }
 
 int TicketTerminal::run_query_ticket(Params const &params, std::ostream &os) {
-	std::vector<TrainManager::QueryResult> res;
+	kupi::vector<TrainManager::QueryResult> res;
 	trains.query_ticket(params['s'], params['t'], Date{params['d']}, res);
-	std::vector<int> p(res.size(), 0);
+	kupi::vector<int> p(res.size(), 0);
 	for (int i = 0; i < p.size(); ++i) p[i] = i;
 	if (params['p'] && params['p'][0] == 't')
 		kupi::sort(p.begin(), p.end(), [&res](int x, int y) { return TrainManager::QueryResult::cmpTime(res[x], res[y]); });
