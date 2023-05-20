@@ -11,6 +11,7 @@ class TicketTerminal {
 public:
 	TicketTerminal(UserManager &userManager, TrainManager &trainManager, BillManager &billManager) : users(userManager), trains(trainManager), bills(billManager) {}
 	int run(char const *s, std::ostream &os);
+	void clean_memory() { loginList.clear(); }
 	static char const *run_result_to_string(int res);
 
 private:
