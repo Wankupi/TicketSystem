@@ -130,9 +130,6 @@ private:
 	void set_ticket(int id, Date d, TicketsOnPath &ret);
 
 private:
-	std::pair<int, bool> get_id_and_released(char const *trainID);
-
-private:
 	kupi::DataBase<Train, true, false> trains;
 	kupi::DataBase<Tickets, false, false> tickets;
 	kupi::bpt<decltype(Train::trainID), int> trainID2int;
@@ -152,7 +149,7 @@ private:
 			return s.d <= d && d <= s.d + (lastDay - firstDay);
 		}
 	};
-	kupi::multibpt<String<30>, train_info_in_station> stations;
+	kupi::multibpt<unsigned long long, train_info_in_station> stations;
 };
 
 }// namespace ticket

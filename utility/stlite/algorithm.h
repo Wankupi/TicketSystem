@@ -6,6 +6,7 @@ using std::lower_bound;
 using std::sort;
 }
 #else
+#include <algorithm>
 
 namespace kupi {
 template<typename T, typename Cmp>
@@ -30,5 +31,6 @@ T *lower_bound(T *beg, T *ed, T const &x) {
 	return ed;
 }
 
+using std::sort;
 }// namespace kupi
 #endif
