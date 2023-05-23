@@ -44,13 +44,14 @@ std::map<int, ticket::TicketTerminal> terms;
 std::mutex task_mutex;
 std::condition_variable is_task;
 
-bool working = false;
+bool web_working = false;
+bool worker_working = false;
 
 void worker_thread() {
 	while (true) {
 		std::unique_lock lock(task_mutex);
-		is_task.wait(lock, []() { return !tasks.empty() || !working; });
-		if (!working) break;
+		is_task.wait(lock, []() { return !tasks.empty() || !worker_working; });
+		if (!worker_working) break;
 		Task task = tasks.front();
 		tasks.pop();
 		lock.unlock();
@@ -61,10 +62,16 @@ void worker_thread() {
 
 		std::istringstream in(task.cmd);
 		std::ostringstream out;
+		static char num[40];
 		static char line[4096];
 		int stat = 0;
-		while (in.getline(line, 4096)) {
+		while (in >> num) {
+			in.get();
+			in.getline(line, 4096);
+			if (!in) break;
+			out << num << " ";
 			stat = term.run(line, out);
+
 			if (stat == 1) break;
 			if (stat == 2) {
 				for (auto &x: terms) {
@@ -75,8 +82,9 @@ void worker_thread() {
 			}
 		}
 		task.ws->send(task.fd, out.str());
-		if (stat == 1)
+		if (stat == 1) {
 			task.ws->close(task.fd);
+		}
 	}
 }
 
@@ -93,33 +101,47 @@ void web_thread() {
 		std::cerr << "session " << fd << " closed." << std::endl;
 	};
 	ws.on_message = [](WebSocket &ws, int fd, std::string str) {
+		std::cout << "receive:\n"
+				  << str << std::endl;
 		std::unique_lock lock(task_mutex);
 		tasks.emplace(&ws, fd, std::move(str));
 		lock.unlock();
 		is_task.notify_all();
 	};
-	ws.start(working);
-	for (auto &x: terms)
+	ws.start(web_working);
+	ws.on_close = nullptr;// ws.close will change terms, which could cause SegmentFault
+	for (auto &x: terms) {
 		ws.close(x.first);
+	}
+	terms.clear();
 }
 
 int main() {
 	std::ios::sync_with_stdio(false);
 	std::cin.tie(0);
 	startComponent();
-	working = true;
+	web_working = true;
+	worker_working = true;
 	std::thread worker(worker_thread);
 	std::thread web(web_thread);
 	std::string s;
 	while (std::cin >> s) {
 		if (s != "stop") continue;
-		working = false;
 		break;
 	}
-	std::cout << "closing files..." << std::endl;
+	std::cout << "stopping working service..." << std::endl;
+	worker_working = false;
 	is_task.notify_all();
 	worker.join();
-	web.join();
+	std::cout << "worker service has shutdown." << std::endl;
+
+	std::cout << "saving files..." << std::endl;
 	stopComponent();
+	std::cout << "saved." << std::endl;
+
+	std::cout << "stopping web service..." << std::endl;
+	web_working = false;
+	web.join();
+	std::cout << "web service has shutdown." << std::endl;
 	return 0;
 }

@@ -178,7 +178,7 @@ void WebSocket::start(bool &check_continue) {
 			}
 		}
 	}
-	close(epoll_fd);
+	::close(epoll_fd);
 	epoll_fd = 0;
 }
 
@@ -212,20 +212,18 @@ void WebSocket::send(int fd, std::string const &data) {
 
 void WebSocket::close(int fd) {
 	if (on_close) on_close(*this, fd);
-	::close(fd);
-	epoll_event event{};
-	event.events = EPOLLIN | EPOLLET;
-	event.data.fd = fd;
-	epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, &event);
+	int res = ::close(fd);
+	if (epoll_fd) {
+		epoll_event event{};
+		event.events = EPOLLIN | EPOLLET;
+		event.data.fd = fd;
+		epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, &event);
+	}
 }
 
 WebSocket::~WebSocket() {
-	if (epoll_fd) {
-		close(epoll_fd);
-		epoll_fd = 0;
-	}
 	if (server_fd) {
-		close(server_fd);
+		::close(server_fd);
 		server_fd = 0;
 	}
 }
