@@ -1,0 +1,56 @@
+@import './base.css';
+
+body {
+	margin: 0;
+	padding: 0;
+	/* overflow-y: hidden;
+	height: 100vh; */
+}
+
+#app {
+	display: block;
+	/* height: 100vh; */
+	/* overflow: hidden; */
+}
+
+a,
+.green {
+	text-decoration: none;
+	color: hsla(160, 100%, 37%, 1);
+	transition: 0.4s;
+}
+
+@media (hover: hover) {
+	a:hover {
+		background-color: hsla(160, 100%, 37%, 0.2);
+	}
+}
+
+/* @media (min-width: 1024px) {
+	body {
+		display: flex;
+		place-items: center;
+	}
+
+	#app {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		padding: 0 2rem;
+	}
+} */
+
+.center {
+	width: 30em;
+	margin: 0 auto;
+}
+
+.my-button {
+	width: 10em;
+	margin: 1em 0;
+}
+
+.flex {
+	display: flex;
+	justify-content: space-around;
+	align-items: center;
+}
