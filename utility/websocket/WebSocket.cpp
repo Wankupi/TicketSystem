@@ -187,7 +187,7 @@ int write_header(char *buff, int len) {
 	*buff++ = 0x81;
 	if (len < 126)
 		*buff++ = len;
-	else if (len <= 32767) {
+	else if (len < (1u << 16)) {
 		*buff++ = 126;
 		*reinterpret_cast<unsigned short *>(buff) = htons(len);
 		buff += 2;
