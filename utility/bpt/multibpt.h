@@ -55,6 +55,14 @@ public:
 		}
 		return res;
 	}
+	void find_all(Key const &key, vector<Val> &res) const {
+		res.clear();
+		auto p = data.lower_bound({key, {}});
+		while (p != data.end() && p->first == key) {
+			res.emplace_back(p->second);
+			++p;
+		}
+	}
 	iterator lower_bound(Key const &key) {
 		return data.lower_bound({key, {}});
 	}
@@ -155,7 +163,12 @@ public:
 	void erase(std::pair<Key, Val> const &x);
 	iterator find(Key const &index);
 	iterator end() { return {nullptr, nullptr, &leave}; }
-	vector<Val> find_all(Key const &index);
+	vector<Val> find_all(Key const &index) {
+		vector<Val> ret;
+		find_all(index, ret);
+		return ret;
+	}
+	void find_all(Key const &index, vector<Val> &res);
 
 private:
 	// root is fixed as nodes[1], or leave[1]
@@ -233,8 +246,9 @@ multibpt<Key, Val, Array>::iterator multibpt<Key, Val, Array>::find(Key const &i
 }
 
 template<typename Key, typename Val, template<typename> class Array>
-vector<Val> multibpt<Key, Val, Array>::find_all(Key const &index) {
-	if (leave.empty()) return {};
+void multibpt<Key, Val, Array>::find_all(Key const &index, vector<Val> &res) {
+	res.clear();// should not release
+	if (leave.empty()) return;
 	auto p = nodes.empty() ? nullptr : nodes[1];
 	auto ptr = nodes.empty() ? leave[1] : nullptr;
 	while (p) {
@@ -246,7 +260,6 @@ vector<Val> multibpt<Key, Val, Array>::find_all(Key const &index) {
 		}
 		p = nodes[next];
 	}
-	vector<Val> res;
 	auto k = lower_bound(ptr->data, ptr->data + ptr->header.size, *reinterpret_cast<pair const *>(&index), cmp_key_leaf);
 	while (ptr) {
 		while (k < ptr->data + ptr->header.size && index == k->first) {
@@ -258,7 +271,6 @@ vector<Val> multibpt<Key, Val, Array>::find_all(Key const &index) {
 		ptr = leave[ptr->header.next];
 		k = ptr->data;
 	}
-	return res;
 }
 
 template<typename Key, typename Val, template<typename> class Array>

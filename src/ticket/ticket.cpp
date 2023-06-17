@@ -17,8 +17,8 @@ int BillManager::add_bill(Bill const &bill) {
 	return 0;
 }
 
-kupi::vector<Bill> BillManager::query_bill(int user_id) {
-	kupi::vector<Bill> res;
+void BillManager::query_bill(int user_id, kupi::vector<Bill> &res) {
+	res.clear();
 	int index = 0;
 	if (user_id <= max_user_id) {
 		auto meta = head.read(user_id);
@@ -30,7 +30,6 @@ kupi::vector<Bill> BillManager::query_bill(int user_id) {
 		res.emplace_back(ret.first);
 		index = ret.second;
 	}
-	return res;
 }
 
 int BillManager::refund_bill(int user_id, int n, Bill &bill) {

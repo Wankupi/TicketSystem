@@ -103,7 +103,8 @@ int TrainManager::query_ticket(char const *S, char const *T, Date date, kupi::ve
 	auto hT = hash_String(T);
 	QueryResult qr;// put it outside the for loop to reduce allocate...
 	TicketsOnPath tp;
-	auto v1 = stations.find_all(hash_String(S));
+	static kupi::vector<train_info_in_station> v1;
+	stations.find_all(hash_String(S), v1);
 	auto p1 = v1.begin();
 	auto p2 = stations.find(hT);
 
