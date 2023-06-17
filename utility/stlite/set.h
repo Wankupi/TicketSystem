@@ -7,6 +7,11 @@ using std::set;
 }
 #else
 #include <set>
+
+#include <cstddef>
+#include <functional>
+#include <utility>
+
 namespace kupi {
 
 enum NodeColor { red,
