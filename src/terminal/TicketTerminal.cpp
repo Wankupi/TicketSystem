@@ -106,7 +106,7 @@ int TicketTerminal::run_add_user(Params const &params, std::ostream &os) {
 			return fail(os, permission_denied);
 	}
 	auto res = users.add_user(params['u'], params['p'], params['n'], params['m'], privilege);
-	if (!res) return fail(os, params_invalid);
+	if (res <= 0) return fail(os, params_invalid);
 	return ok(os);
 }
 
