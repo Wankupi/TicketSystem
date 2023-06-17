@@ -127,8 +127,6 @@ int TicketTerminal::run_logout(Params const &params, std::ostream &os) {
 }
 
 int TicketTerminal::run_query_profile(Params const &params, std::ostream &os) {
-	//	if (!params['c'] || !params['u'])
-	//		return fail(os, params_missing);
 	int id_cur = users.find(params['c']);
 	if (!loginList.count(id_cur))
 		return fail(os, un_login);
@@ -188,8 +186,6 @@ void split_string_to_int(char const *start, int t[], int n) {
 
 int TicketTerminal::run_add_train(Params const &params, std::ostream &os) {
 	Train train;
-	// TODO: after debug, this line could be removed
-	memset(&train, 0, sizeof(train));
 	train.trainID = params['i'];
 	train.stationNum = atoi(params['n']);
 	train.seatNum = atoi(params['m']);
@@ -256,14 +252,14 @@ int TicketTerminal::run_query_train(Params const &params, std::ostream &os) {
 }
 
 int TicketTerminal::run_query_ticket(Params const &params, std::ostream &os) {
-	kupi::vector<TrainManager::QueryResult> res;
+	static kupi::vector<TrainManager::QueryResult> res;
 	trains.query_ticket(params['s'], params['t'], Date{params['d']}, res);
 	kupi::vector<int> p(res.size(), 0);
 	for (int i = 0; i < p.size(); ++i) p[i] = i;
 	if (params['p'] && params['p'][0] == 't')
-		kupi::sort(p.begin(), p.end(), [&res](int x, int y) { return TrainManager::QueryResult::cmpTime(res[x], res[y]); });
+		kupi::sort(p.begin(), p.end(), [](int x, int y) { return TrainManager::QueryResult::cmpTime(res[x], res[y]); });
 	else
-		kupi::sort(p.begin(), p.end(), [&res](int x, int y) { return TrainManager::QueryResult::cmpCost(res[x], res[y]); });
+		kupi::sort(p.begin(), p.end(), [](int x, int y) { return TrainManager::QueryResult::cmpCost(res[x], res[y]); });
 
 	os << res.size();
 	for (int i: p) {
@@ -318,7 +314,8 @@ int TicketTerminal::run_query_order(Params const &params, std::ostream &os) {
 	int user_id = users.find(params['u']);
 	if (!loginList.count(user_id))
 		return fail(os, un_login);
-	auto res = bills.query_bill(user_id);
+	static kupi::vector<Bill> res;
+	bills.query_bill(user_id, res);
 	os << res.size();
 	for (auto const &bill: res)
 		os << '\n'
@@ -342,7 +339,8 @@ int TicketTerminal::run_refund_ticket(Params const &params, std::ostream &os) {
 	// deal with waiting list
 	std::pair<int, Date> meta{bill.train_id, bill.start};
 	auto cur = bills.get_waiting(meta.first, meta.second), end = bills.end_of_waiting();
-	kupi::vector<int> successes;
+	static kupi::vector<int> successes;
+	successes.clear();
 	TrainManager::buy_ticket_result buy_res;
 	while (cur != end && cur->first == meta) {
 		bills.get_bill(cur->second, bill);

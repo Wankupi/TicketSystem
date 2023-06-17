@@ -30,7 +30,7 @@ public:
 	BillManager(std::string const &head_file, std::string const &data_file, std::string const &wait_list_file)
 		: head(head_file), data(data_file), waiting(wait_list_file), max_user_id(head.size()) {}
 	int add_bill(Bill const &bill);
-	kupi::vector<Bill> query_bill(int user_id);
+	void query_bill(int user_id, kupi::vector<Bill> &res);
 	/**
 	 * @return 0 success
 	 * @return -1  this user do not have that many bills
